@@ -152,7 +152,7 @@ def analyze_with_gemini(stock_name, ticker, tech_data):
     - السعر: {tech_data['price']}
     - RSI: {tech_data['rsi']}
     
-    أرجع JSON بتنصيص مزدوج صحيح:
+    أرجع JSON بتنصيص مزدوج صحيح بهذا الشكل فقط:
     {{"rec": "دخول", "target": 0.0, "stop": 0.0, "reason": "سبب مختصر"}}
     """
     try:
@@ -169,7 +169,7 @@ def analyze_with_gemini(stock_name, ticker, tech_data):
     return {"rec": "انتظار", "target": "-", "stop": "-", "reason": f"مؤشر RSI عند {tech_data['rsi']}"}
 
 def send_telegram(text):
-    if not text.strip():
+    if not text or not text.strip():
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
@@ -180,7 +180,8 @@ def send_telegram(text):
     requests.post(url, json=payload)
 
 if __name__ == "__main__":
-    chunk = "<b>📊 تقرير توصيات الأسهم المصرية</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
+    header = "📈 <b>توصيات الأسهم المصرية اليومية</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
+    current_message = header
     
     for item in STOCKS_113:
         ticker, name = item["t"], item["n"]
@@ -188,22 +189,18 @@ if __name__ == "__main__":
         if data:
             ans = analyze_with_gemini(name, ticker, data)
             
-            # بناء البطاقة بصيغة HTML صريحة بدون طباعة JSON
-            card = f"📌 <b>{name}</b> ({ticker})\n"
-            card += f"💵 <b>السعر:</b> {data['price']} ج.م\n"
-            card += f"📊 <b>RSI:</b> {data['rsi']}\n"
+            card = f"🔹 <b>{name}</b> ({ticker})\n"
+            card += f"💵 <b>السعر:</b> {data['price']} ج.م | 📊 <b>RSI:</b> {data['rsi']}\n"
             card += f"🎯 <b>التوصية:</b> {ans.get('rec', 'انتظار')}\n"
-            card += f"🟢 <b>الهدف:</b> {ans.get('target', '-')}\n"
-            card += f"🔴 <b>وقف الخسارة:</b> {ans.get('stop', '-')}\n"
+            card += f"🟢 <b>الهدف:</b> {ans.get('target', '-')} | 🔴 <b>الوقف:</b> {ans.get('stop', '-')}\n"
             card += f"💡 <b>السبب:</b> {ans.get('reason', '-')}\n"
             card += "-----------------------------------\n\n"
             
-            if len(chunk) + len(card) > 3500:
-                send_telegram(chunk)
-                chunk = card
+            if len(current_message) + len(card) > 3500:
+                send_telegram(current_message)
+                current_message = card
             else:
-                chunk += card
+                current_message += card
                 
-    if chunk.strip():
-        send_telegram(chunk)
-                
+    if current_message != header and len(current_message) > 0:
+        send_telegram(current_message)
