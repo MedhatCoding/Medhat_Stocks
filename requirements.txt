@@ -1,5 +1,4 @@
-requests
-google-genai
 streamlit
+requests
 pandas
-pytz
+google-genai
