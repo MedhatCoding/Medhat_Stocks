@@ -3,16 +3,18 @@ import requests
 import pandas as pd
 from google import genai
 
-# المفاتيح
+# جلب المفاتيح من متغيرات البيئة
 OANOR_KEY = os.getenv("OANOR_API_KEY")
 EODHD_KEY = os.getenv("EODHD_API_KEY")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# قائمة مصغرة للاختبار من الأسهم الشرعية الـ 113
+# عينة تجريبية من الأسهم الشرعية للبدء بها
 SHARIAH_STOCKS = ["COPR.EGX", "AMOC.EGX", "SWDY.EGX", "TMGH.EGX"]
 
 def fetch_eodhd_data(ticker):
-    """جلب البيانات التاريخية لحساب المؤشرات الفنية"""
+    """جلب البيانات التاريخية وحساب مؤشر RSI"""
     url = f"https://eodhd.com/api/eod/{ticker}?api_token={EODHD_KEY}&fmt=json"
     try:
         res = requests.get(url)
@@ -20,7 +22,8 @@ def fetch_eodhd_data(ticker):
             df = pd.DataFrame(res.json())
             if not df.empty:
                 df['close'] = pd.to_numeric(df['close'])
-                # حساب مؤشر القوة النسبية RSI مبسط
+                
+                # حساب مؤشر القوة النسبية RSI (14)
                 delta = df['close'].diff()
                 gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -35,17 +38,17 @@ def fetch_eodhd_data(ticker):
     return {"price": 0, "rsi": 50}
 
 def analyze_with_gemini(ticker, tech_data):
-    """تحليل السهم بواسطة Gemini API للدمج بين الفني والأخبار"""
+    """تحليل السهم بواسطة Gemini API للحصول على تقييم مركّب"""
     client = genai.Client(api_key=GEMINI_KEY)
     
     prompt = f"""
-    أنت محلل مالي خبير في Borsa Egypt (EGX).
-    قم بتحليل السهم التالي بناءً على البيانات الفنية المتاحة وقدم توصية استثمارية محددة:
+    أنت محلل مالي خبير في البورصة المصرية (EGX).
+    قم بتحليل السهم التالي وقدم توصية استثمارية مباشرة:
     - السهم: {ticker}
     - السعر الحالي: {tech_data['price']} EGP
     - مؤشر القوة النسبية (RSI 14): {tech_data['rsi']}
 
-    المطلوب رد بصيغة JSON خالية من أي نصوص إضافية بالهيكل التالي:
+    المطلوب رد بصيغة JSON خالية تماماً من أي تنسيق ماركداون وبدون أي نصوص جانبية بالهيكل التالي:
     {{
         "ticker": "{ticker}",
         "score": 85,
@@ -54,8 +57,7 @@ def analyze_with_gemini(ticker, tech_data):
         "target_1": 0.0,
         "target_2": 0.0,
         "stop_loss": 0.0,
-        "risk_reward_ratio": "1:2",
-        "reasoning": "سبب التوصية باختصار"
+        "reasoning": "سبب التوصية باختصار شديد"
     }}
     """
     try:
@@ -69,11 +71,30 @@ def analyze_with_gemini(ticker, tech_data):
         print(f"خطأ في تحليل Gemini للسهم {ticker}: {e}")
         return None
 
+def send_telegram_msg(message):
+    """إرسال التقرير النهائي للتلجرام"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    requests.post(url, json=payload)
+
 if __name__ == "__main__":
-    print("=== بدء عملية التحليل الذكي للأسهم ===")
+    print("=== بدء تحليل الأسهم وإرسال التقرير ===")
+    summary_report = "📊 *تقرير التحليل اليومي للأسهم المصرية*\n\n"
+    
     for stock in SHARIAH_STOCKS:
         tech = fetch_eodhd_data(stock)
-        print(f"\n[+] جاري تحليل {stock}...")
-        analysis = analyze_with_gemini(stock, tech)
-        print(analysis)
-              
+        analysis_raw = analyze_with_gemini(stock, tech)
+        
+        if analysis_raw:
+            summary_report += f"🔹 *السهم:* {stock}\n"
+            summary_report += f"💵 *السعر:* {tech['price']} EGP | RSI: {tech['rsi']}\n"
+            summary_report += f"📝 *التحليل:* {analysis_raw}\n"
+            summary_report += "---------------------\n"
+            
+    send_telegram_msg(summary_report)
+    print("✅ تم إرسال التقرير الكامل إلى التلجرام بنجاح!")
+    
