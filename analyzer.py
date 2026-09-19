@@ -10,7 +10,7 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# القائمة الكاملة بـ 113 سهم مع تفادي مشاكل الاتجاهات
+# القائمة الكاملة بـ 113 سهم
 STOCKS_113 = [
     {"t": "CAED.EGX", "n": "القاهرة للخدمات التعليمية"},
     {"t": "CLHO.EGX", "n": "مستشفى كليوباترا"},
@@ -84,7 +84,7 @@ STOCKS_113 = [
     {"t": "MOED.EGX", "n": "المصرية لنظم التعليم الحديثة"},
     {"t": "MOSC.EGX", "n": "مصر للزيوت والصابون"},
     {"t": "MPCI.EGX", "n": "ممفيس للأدوية"},
-    {"ticker": "MPCO.EGX", "name": "المنصورة للدواجن"},
+    {"t": "MPCO.EGX", "n": "المنصورة للدواجن"},
     {"t": "MTIE.EGX", "n": "ام ام جروب"},
     {"t": "NCCW.EGX", "n": "النصر للأعمال المدنية"},
     {"t": "NCGC.EGX", "n": "النيل لحليج الأقطان"},
@@ -142,22 +142,22 @@ def fetch_stock_data(ticker):
                 df['rsi'] = 100 - (100 / (1 + rs))
                 return {"price": round(df['close'].iloc[-1], 2), "rsi": round(df['rsi'].iloc[-1], 2)}
     except Exception as e:
-        print(f"Error {ticker}: {e}")
+        print(f"Error fetching {ticker}: {e}")
     return None
 
 def analyze_with_gemini(stock_name, ticker, tech_data):
     client = genai.Client(api_key=GEMINI_KEY)
     prompt = f"""
-    حلل سهم "{stock_name}" ({ticker}):
-    - السعر: {tech_data['price']} جنيه
-    - RSI: {tech_data['rsi']}
+    أنت محلل مالي. قم بتحليل سهم "{stock_name}" ({ticker}):
+    - السعر الحالى: {tech_data['price']}
+    - مؤشر RSI: {tech_data['rsi']}
 
-    رد بـ JSON فقط:
+    أرجع ردك على هيئة JSON بنفس الأسماء التالية فقط:
     {{
         "rec": "دخول / شراء / انتظار / خروج",
         "target": 0.0,
         "stop": 0.0,
-        "reason": "سبب فني مختصر جداً بالعربي"
+        "reason": "سبب مختصر بالعربي"
     }}
     """
     try:
@@ -172,15 +172,25 @@ def analyze_with_gemini(stock_name, ticker, tech_data):
         return None
 
 def send_telegram(text):
+    if not text.strip():
+        return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"})
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+    requests.post(url, json=payload)
 
 if __name__ == "__main__":
-    report = "📊 <b>تقرير الأسهم المصرية المعتمدة</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
+    # الإرسال المباشر لكل سهم يقلل خطأ انقطاع الرسائل
+    header_sent = False
+    
+    current_chunk = "📊 <b>تقرير توصيات أسهم البورصة المصرية</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
     
     for item in STOCKS_113:
-        ticker = item.get("t") or item.get("ticker")
-        name = item.get("n") or item.get("name")
+        ticker = item["t"]
+        name = item["n"]
         
         data = fetch_stock_data(ticker)
         if data:
@@ -195,11 +205,12 @@ if __name__ == "__main__":
                 card += f"💡 <b>السبب:</b> {ans.get('reason', '-')}\n"
                 card += "-----------------------------------\n\n"
                 
-                if len(report) + len(card) > 3800:
-                    send_telegram(report)
-                    report = card
+                if len(current_chunk) + len(card) > 3000:
+                    send_telegram(current_chunk)
+                    current_chunk = card
                 else:
-                    report += card
-                    
-    if report:
-        send_telegram(report)
+                    current_chunk += card
+
+    # إرسال باقي الرسالة الأخير بشكل أكيد
+    if len(current_chunk) > 0:
+        send_telegram(current_chunk)
