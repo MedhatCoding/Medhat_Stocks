@@ -141,24 +141,19 @@ def fetch_stock_data(ticker):
                 rs = gain / loss
                 df['rsi'] = 100 - (100 / (1 + rs))
                 return {"price": round(df['close'].iloc[-1], 2), "rsi": round(df['rsi'].iloc[-1], 2)}
-    except Exception as e:
-        print(f"Error fetching {ticker}: {e}")
+    except Exception:
+        pass
     return None
 
 def analyze_with_gemini(stock_name, ticker, tech_data):
     client = genai.Client(api_key=GEMINI_KEY)
     prompt = f"""
-    أنت محلل مالي. قم بتحليل سهم "{stock_name}" ({ticker}):
-    - السعر الحالى: {tech_data['price']}
-    - مؤشر RSI: {tech_data['rsi']}
-
-    أرجع ردك على هيئة JSON بنفس الأسماء التالية فقط:
-    {{
-        "rec": "دخول / شراء / انتظار / خروج",
-        "target": 0.0,
-        "stop": 0.0,
-        "reason": "سبب مختصر بالعربي"
-    }}
+    حلل سهم "{stock_name}" ({ticker}):
+    - السعر: {tech_data['price']}
+    - RSI: {tech_data['rsi']}
+    
+    أرجع JSON بتنصيص مزدوج صحيح:
+    {{"rec": "دخول", "target": 0.0, "stop": 0.0, "reason": "سبب مختصر"}}
     """
     try:
         res = client.models.generate_content(
@@ -166,10 +161,12 @@ def analyze_with_gemini(stock_name, ticker, tech_data):
             contents=prompt,
             config={"response_mime_type": "application/json"}
         )
-        return json.loads(res.text)
-    except Exception as e:
-        print(f"Gemini error {ticker}: {e}")
-        return None
+        data = json.loads(res.text)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {"rec": "انتظار", "target": "-", "stop": "-", "reason": f"مؤشر RSI عند {tech_data['rsi']}"}
 
 def send_telegram(text):
     if not text.strip():
@@ -183,34 +180,30 @@ def send_telegram(text):
     requests.post(url, json=payload)
 
 if __name__ == "__main__":
-    # الإرسال المباشر لكل سهم يقلل خطأ انقطاع الرسائل
-    header_sent = False
-    
-    current_chunk = "📊 <b>تقرير توصيات أسهم البورصة المصرية</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
+    chunk = "<b>📊 تقرير توصيات الأسهم المصرية</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
     
     for item in STOCKS_113:
-        ticker = item["t"]
-        name = item["n"]
-        
+        ticker, name = item["t"], item["n"]
         data = fetch_stock_data(ticker)
         if data:
             ans = analyze_with_gemini(name, ticker, data)
-            if ans:
-                card = f"📌 <b>{name}</b> ({ticker})\n"
-                card += f"💵 <b>السعر:</b> {data['price']} ج.م\n"
-                card += f"📊 <b>RSI:</b> {data['rsi']}\n"
-                card += f"🎯 <b>التوصية:</b> {ans.get('rec', 'انتظار')}\n"
-                card += f"🟢 <b>الهدف:</b> {ans.get('target', '-')} ج.م\n"
-                card += f"🔴 <b>وقف الخسارة:</b> {ans.get('stop', '-')} ج.م\n"
-                card += f"💡 <b>السبب:</b> {ans.get('reason', '-')}\n"
-                card += "-----------------------------------\n\n"
+            
+            # بناء البطاقة بصيغة HTML صريحة بدون طباعة JSON
+            card = f"📌 <b>{name}</b> ({ticker})\n"
+            card += f"💵 <b>السعر:</b> {data['price']} ج.م\n"
+            card += f"📊 <b>RSI:</b> {data['rsi']}\n"
+            card += f"🎯 <b>التوصية:</b> {ans.get('rec', 'انتظار')}\n"
+            card += f"🟢 <b>الهدف:</b> {ans.get('target', '-')}\n"
+            card += f"🔴 <b>وقف الخسارة:</b> {ans.get('stop', '-')}\n"
+            card += f"💡 <b>السبب:</b> {ans.get('reason', '-')}\n"
+            card += "-----------------------------------\n\n"
+            
+            if len(chunk) + len(card) > 3500:
+                send_telegram(chunk)
+                chunk = card
+            else:
+                chunk += card
                 
-                if len(current_chunk) + len(card) > 3000:
-                    send_telegram(current_chunk)
-                    current_chunk = card
-                else:
-                    current_chunk += card
-
-    # إرسال باقي الرسالة الأخير بشكل أكيد
-    if len(current_chunk) > 0:
-        send_telegram(current_chunk)
+    if chunk.strip():
+        send_telegram(chunk)
+                
