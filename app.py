@@ -760,7 +760,7 @@ elif page == "☆  المتابعة":
             if result.get("success"):
                 st.markdown(
                     '<div class="m-card-grid">'
-                    f'{app_card("السهم", symbol, result.get("date","—"))}'
+                    f'{app_card("الشركة", data_engine.arabic_company_name(symbol, symbol), "رمز التداول: " + symbol)}'
                     f'{app_card("السعر", money(result.get("close")), "آخر إغلاق")}'
                     f'{app_card("التغير", pct(result.get("change_pct")), "الجلسة الأخيرة")}'
                     f'{app_card("الفرصة", result.get("final_opportunity_score","—"), "من 100")}'
@@ -821,7 +821,7 @@ elif page == "▣  المحفظة":
             if value is not None:
                 total_value += value
             rows.append({
-                "الشركة/السهم": pos["symbol"], "الكمية": pos["qty"], "متوسط الدخول": money(pos["avg"]),
+                "الشركة": data_engine.arabic_company_name(pos["symbol"], pos["symbol"]), "الرمز": pos["symbol"], "الكمية": pos["qty"], "متوسط الدخول": money(pos["avg"]),
                 "السعر الحالي": money(price), "التغير %": pct(latest.get("change_pct")) if latest.get("success") else "—",
                 "القيمة الحالية": money(value), "الربح/الخسارة": money(pnl),
             })
@@ -864,7 +864,7 @@ elif page == "⌕  تحليل":
     suggestions = data_engine.search_symbols(query) if query else []
     if suggestions:
         st.caption("اقتراحات من قائمة EGX:")
-        labels = [f"{x['symbol']} — {x['name']}" for x in suggestions[:6]]
+        labels = [f"{x['symbol']} — {data_engine.arabic_company_name(x['symbol'], x['name'])}" for x in suggestions[:6]]
         picked = st.selectbox("اختر من النتائج", labels, label_visibility="collapsed")
         selected_symbol = picked.split(" — ")[0]
     else:
