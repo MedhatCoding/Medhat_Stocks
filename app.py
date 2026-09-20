@@ -9,6 +9,14 @@ from data_engine import data_engine
 from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE, is_sharia_reference
 from config import APP_NAME, APP_VERSION, STOCK_UNIVERSE_SIZE
 
+# Optional live override: put SHARIA_SYMBOLS = "AAA,BBB,CCC" in Streamlit Secrets.
+try:
+    _sharia_override = st.secrets.get("SHARIA_SYMBOLS", "")
+    if _sharia_override:
+        SHARIA_SYMBOLS = [x.strip().upper().replace(".EGX", "") for x in str(_sharia_override).split(",") if x.strip()]
+except Exception:
+    pass
+
 
 st.set_page_config(
     page_title=APP_NAME,
