@@ -261,31 +261,42 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 /* STRUCTURAL MOBILE APP SHELL */
 .app-bottom-nav{display:none}
 @media(max-width:700px){
- .main .block-container{padding-bottom:105px!important}
- /* The navigation radio is now part of the page, not a sidebar. */
+ .main .block-container{padding-bottom:110px!important}
+ /* Real mobile app dock: fixed to the bottom of the viewport. */
  div[data-testid="stRadio"]{
    position:fixed!important;left:0!important;right:0!important;bottom:0!important;
-   z-index:100000!important;margin:0!important;padding:5px 6px 7px!important;
-   background:rgba(8,19,33,.98)!important;border-top:1px solid #29415c!important;
-   box-shadow:0 -12px 35px rgba(0,0,0,.5)!important;
+   z-index:999999!important;width:100vw!important;height:82px!important;
+   margin:0!important;padding:6px 7px 8px!important;
+   background:#081321!important;border-top:1px solid #29415c!important;
+   box-shadow:0 -14px 35px rgba(0,0,0,.55)!important;
    direction:rtl!important;
  }
  div[data-testid="stRadio"]>label{display:none!important}
+ div[data-testid="stRadio"]>div{width:100%!important;margin:0!important;padding:0!important}
  div[data-testid="stRadio"] [role="radiogroup"]{
-   display:grid!important;grid-template-columns:repeat(7,1fr)!important;
-   gap:3px!important;width:100%!important;
+   display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;
+   gap:2px!important;width:100%!important;height:68px!important;
+   margin:0!important;padding:0!important;
  }
  div[data-testid="stRadio"] [role="radio"]{
    display:flex!important;align-items:center!important;justify-content:center!important;
-   height:62px!important;min-height:62px!important;padding:4px 1px!important;
-   margin:0!important;border-radius:13px!important;border:1px solid transparent!important;
-   background:transparent!important;color:#71869b!important;font-size:8px!important;
-   font-weight:800!important;line-height:1.25!important;text-align:center!important;
+   width:100%!important;height:66px!important;min-height:66px!important;
+   padding:5px 1px!important;margin:0!important;border-radius:13px!important;
+   border:1px solid transparent!important;background:transparent!important;
+   color:#71869b!important;font-size:8px!important;font-weight:800!important;
+   line-height:1.25!important;text-align:center!important;white-space:normal!important;
  }
- div[data-testid="stRadio"] [role="radio"][aria-checked="true"]{
-   background:#102b21!important;color:#83f2b5!important;border-color:#24583f!important;
- }
+ div[data-testid="stRadio"] [role="radio"]>div{display:flex!important;align-items:center!important;justify-content:center!important}
  div[data-testid="stRadio"] [role="radio"]>div:first-child{display:none!important}
+ div[data-testid="stRadio"] [role="radio"][aria-checked="true"]{
+   background:#102b21!important;color:#83f2b5!important;
+   border-color:#24583f!important;
+ }
+ /* Streamlit versions that render options as labels instead of role=radio. */
+ div[data-testid="stRadio"] label{
+   display:flex!important;align-items:center!important;justify-content:center!important;
+   text-align:center!important;
+ }
 }
 @media(max-width:390px){
  div[data-testid="stRadio"] [role="radio"]{font-size:7px!important}
