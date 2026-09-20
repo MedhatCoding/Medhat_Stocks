@@ -8,7 +8,7 @@ import requests
 from data_engine import DataEngine
 
 TZ = ZoneInfo("Africa/Cairo")
-SEND_HOUR = 15
+SEND_HOUR = 9
 MIN_SCORE = 55
 MIN_REBOUND = 45
 MAX_RISK = 65
@@ -55,10 +55,11 @@ def main():
         print("Market context unavailable. No message.")
         return
 
-    # If the latest market date is not today in Cairo, EGX was not open today
-    # (holiday, closure, or data not published yet), so do not send stale signals.
-    if str(market.get("date", "")) != now.date().isoformat() and not force:
-        print("No completed EGX session for today. No message.")
+    # This is a pre-market report: use the latest completed EGX session
+    # available before the opening, rather than requiring today's session data.
+    latest_market_date = str(market.get("date", ""))
+    if not latest_market_date and not force:
+        print("No latest EGX market date available. No message.")
         return
 
     result = engine.get_opportunities(limit=12)
@@ -79,8 +80,9 @@ def main():
         return
 
     lines = [
-        "📊 <b>مدحت ستوكس — فرص EGX اليوم</b>",
+        "📊 <b>مدحت ستوكس — فرص EGX قبل الافتتاح</b>",
         f"📅 {html.escape(now.strftime('%Y-%m-%d'))} — {html.escape(now.strftime('%H:%M'))} القاهرة",
+        f"📚 آخر جلسة مكتملة بالبيانات: <b>{html.escape(latest_market_date)}</b>",
         f"📈 حالة السوق: <b>{html.escape(str(market.get('regime', 'غير متاح')))}</b>",
         "",
     ]
@@ -95,14 +97,17 @@ def main():
         news_text = "غير متاح" if news is None else f"{float(news):+.2f}"
         setup = html.escape(str(row.get("setup", "—")))
         lines.append(
-            f"<b>{index}. {symbol}</b> — فرصة {score}/100\n"
-            f"ارتداد {rebound}/100 • مخاطر {risk}/100 • RSI {rsi}\n"
-            f"الأخبار {news_text} • {setup}" 
+            f"<b>{index}. {symbol}</b> — فرصة {score}/100
+"
+            f"ارتداد {rebound}/100 • مخاطر {risk}/100 • RSI {rsi}
+"
+            f"الأخبار {news_text} • {setup}"
         )
         lines.append("")
 
-    lines.append("⚠️ <i>هذه مرشحات تحليلية وليست أمراً بالشراء أو البيع. البيانات الفعلية فقط، ولا تُرسل رسالة عند عدم وجود فرصة مؤهلة.</i>")
-    send_telegram(token, chat_id, "\n".join(lines))
+    lines.append("⚠️ <i>هذه مرشحات تحليلية قبل الافتتاح وليست أمراً بالشراء أو البيع. البيانات الفعلية فقط، ولا تُرسل رسالة عند عدم وجود فرصة مؤهلة.</i>")
+    send_telegram(token, chat_id, "
+".join(lines))
     print(f"Telegram sent: {len(rows[:5])} opportunities.")
 
 
