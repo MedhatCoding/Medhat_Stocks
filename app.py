@@ -1,7 +1,7 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title="Medhat Stocks AI",
+    page_title="مدحت ستوكس AI",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -10,6 +10,11 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    html, body, [class*="css"] {
+        direction: rtl;
+        text-align: right;
+    }
+
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -49,286 +54,285 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# -------------------------
-# Sidebar
-# -------------------------
+# =========================
+# القائمة الجانبية
+# =========================
 
 with st.sidebar:
-    st.markdown("## 📈 Medhat Stocks AI")
-    st.caption("EGX • Sharia-compliant stocks")
+    st.markdown("## 📈 مدحت ستوكس AI")
+    st.caption("البورصة المصرية • الأسهم المتوافقة مع الشريعة")
 
     st.divider()
 
-    page = st.radio(
-        "Navigation",
+    الصفحة = st.radio(
+        "القائمة الرئيسية",
         [
-            "Dashboard",
-            "Market",
-            "Opportunities",
-            "Watchlist",
-            "Portfolio",
-            "Research",
-            "Settings",
+            "لوحة التحكم",
+            "السوق",
+            "الفرص",
+            "قائمة المتابعة",
+            "المحفظة",
+            "البحث والتحليل",
+            "الإعدادات",
         ],
     )
 
     st.divider()
 
-    st.caption("AI analysis runs in the background.")
-    st.caption("Version 1.0")
+    st.caption("التحليل بالذكاء الاصطناعي يعمل في الخلفية.")
+    st.caption("الإصدار 1.0")
 
-# -------------------------
-# Dashboard
-# -------------------------
+# =========================
+# لوحة التحكم
+# =========================
 
-if page == "Dashboard":
+if الصفحة == "لوحة التحكم":
 
     st.markdown(
-        '<div class="main-title">Egyptian Stock Market AI</div>',
+        '<div class="main-title">التحليل الذكي للبورصة المصرية</div>',
         unsafe_allow_html=True,
     )
 
     st.markdown(
         '<div class="subtitle">'
-        "AI-assisted analysis of Sharia-compliant EGX stocks"
+        "منصة مساعدة لتحليل الأسهم المصرية المتوافقة مع الشريعة الإسلامية"
         "</div>",
         unsafe_allow_html=True,
     )
 
-    # Market overview
-    c1, c2, c3, c4 = st.columns(4)
+    عمود1, عمود2, عمود3, عمود4 = st.columns(4)
 
-    with c1:
+    with عمود1:
         st.markdown(
             '<div class="card">'
-            '<div class="muted">Market Status</div>'
+            '<div class="muted">حالة السوق</div>'
             '<div class="score">—</div>'
-            '<div class="muted">Waiting for data</div>'
+            '<div class="muted">في انتظار البيانات</div>'
             "</div>",
             unsafe_allow_html=True,
         )
 
-    with c2:
+    with عمود2:
         st.markdown(
             '<div class="card">'
-            '<div class="muted">Stocks Analyzed</div>'
+            '<div class="muted">الأسهم محل التحليل</div>'
             '<div class="score">113</div>'
-            '<div class="muted">Sharia universe</div>'
+            '<div class="muted">قائمة الأسهم الشرعية</div>'
             "</div>",
             unsafe_allow_html=True,
         )
 
-    with c3:
+    with عمود3:
         st.markdown(
             '<div class="card">'
-            '<div class="muted">Opportunities</div>'
+            '<div class="muted">الفرص الحالية</div>'
             '<div class="score">—</div>'
-            '<div class="muted">Analysis pending</div>'
+            '<div class="muted">في انتظار التحليل</div>'
             "</div>",
             unsafe_allow_html=True,
         )
 
-    with c4:
+    with عمود4:
         st.markdown(
             '<div class="card">'
-            '<div class="muted">Data Health</div>'
+            '<div class="muted">سلامة البيانات</div>'
             '<div class="score">—</div>'
-            '<div class="muted">Not connected</div>'
+            '<div class="muted">لم يتم الاتصال بعد</div>'
             "</div>",
             unsafe_allow_html=True,
         )
 
-    st.subheader("Today's Analysis")
+    st.subheader("تحليل اليوم")
 
     st.info(
-        "The analysis engine is not connected yet. "
-        "The next steps will connect market data, technical analysis, "
-        "fundamentals, AI interpretation, risk analysis and Telegram reports."
+        "محرك التحليل لم يتم ربطه بالبيانات الحقيقية بعد. "
+        "سيتم في المرحلة التالية ربط بيانات السوق والتحليل الفني "
+        "والتحليل الأساسي والأخبار والذكاء الاصطناعي وإدارة المخاطر."
     )
 
-    st.subheader("Decision Engine")
+    st.subheader("محرك القرارات")
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    عمود1, عمود2, عمود3, عمود4, عمود5 = st.columns(5)
 
-    with col1:
-        st.metric("Entry Opportunity", "—")
+    with عمود1:
+        st.metric("فرصة دخول", "—")
 
-    with col2:
-        st.metric("Oversold", "—")
+    with عمود2:
+        st.metric("تشبع بيعي", "—")
 
-    with col3:
-        st.metric("Watchlist", "—")
+    with عمود3:
+        st.metric("قائمة متابعة", "—")
 
-    with col4:
-        st.metric("No Trade", "—")
+    with عمود4:
+        st.metric("لا توجد صفقة", "—")
 
-    with col5:
-        st.metric("Rejected", "—")
+    with عمود5:
+        st.metric("مرفوض", "—")
 
-    st.subheader("Top Opportunities")
+    st.subheader("أهم الفرص")
 
     st.dataframe(
         {
-            "Symbol": [],
-            "Company": [],
-            "Sector": [],
-            "Opportunity Score": [],
-            "Decision": [],
-            "Risk": [],
+            "السهم": [],
+            "الشركة": [],
+            "القطاع": [],
+            "درجة الفرصة": [],
+            "القرار": [],
+            "المخاطر": [],
         },
         use_container_width=True,
         hide_index=True,
     )
 
-# -------------------------
-# Market
-# -------------------------
+# =========================
+# السوق
+# =========================
 
-elif page == "Market":
+elif الصفحة == "السوق":
 
-    st.title("Market")
+    st.title("السوق")
 
     st.info(
-        "Market data will appear here after connecting the EGX data engine."
+        "ستظهر بيانات السوق هنا بعد ربط محرك بيانات البورصة المصرية."
     )
 
-    st.subheader("Market Regime")
+    st.subheader("حالة السوق")
 
-    c1, c2, c3 = st.columns(3)
+    عمود1, عمود2, عمود3 = st.columns(3)
 
-    with c1:
-        st.metric("Trend", "—")
+    with عمود1:
+        st.metric("الاتجاه", "—")
 
-    with c2:
-        st.metric("Breadth", "—")
+    with عمود2:
+        st.metric("اتساع السوق", "—")
 
-    with c3:
-        st.metric("Volatility", "—")
+    with عمود3:
+        st.metric("التذبذب", "—")
 
-# -------------------------
-# Opportunities
-# -------------------------
+# =========================
+# الفرص
+# =========================
 
-elif page == "Opportunities":
+elif الصفحة == "الفرص":
 
-    st.title("Opportunities")
+    st.title("الفرص")
 
     st.info(
-        "Stocks will be listed here after the analysis engine evaluates "
-        "price action, liquidity, fundamentals, news, risk and confirmation."
+        "سيتم عرض الأسهم التي يجتاز تقييمها محرك التحليل "
+        "بعد فحص السعر والسيولة والأساسيات والأخبار والمخاطر."
     )
 
     st.dataframe(
         {
-            "Symbol": [],
-            "Company": [],
-            "Score": [],
-            "Decision": [],
-            "Why Now": [],
-            "Risk": [],
+            "السهم": [],
+            "الشركة": [],
+            "الدرجة": [],
+            "القرار": [],
+            "لماذا الآن؟": [],
+            "المخاطر": [],
         },
         use_container_width=True,
         hide_index=True,
     )
 
-# -------------------------
-# Watchlist
-# -------------------------
+# =========================
+# قائمة المتابعة
+# =========================
 
-elif page == "Watchlist":
+elif الصفحة == "قائمة المتابعة":
 
-    st.title("Watchlist")
-
-    st.info(
-        "Your tracked stocks will appear here."
-    )
-
-# -------------------------
-# Portfolio
-# -------------------------
-
-elif page == "Portfolio":
-
-    st.title("Portfolio")
+    st.title("قائمة المتابعة")
 
     st.info(
-        "Portfolio tracking will be connected after the core analysis engine."
+        "ستظهر هنا الأسهم التي تريد متابعتها."
     )
 
-# -------------------------
-# Research
-# -------------------------
+# =========================
+# المحفظة
+# =========================
 
-elif page == "Research":
+elif الصفحة == "المحفظة":
 
-    st.title("Research")
+    st.title("المحفظة")
+
+    st.info(
+        "سيتم ربط متابعة المحفظة بعد الانتهاء من محرك التحليل الأساسي."
+    )
+
+# =========================
+# البحث والتحليل
+# =========================
+
+elif الصفحة == "البحث والتحليل":
+
+    st.title("البحث والتحليل")
 
     st.markdown(
         """
-        ### Research Mode
+        ### وضع البحث
 
-        Search and investigate an individual EGX stock.
+        ابحث عن سهم مصري لتحليله.
 
-        The research engine will combine:
+        سيجمع محرك البحث بين:
 
-        - Market data
-        - Technical analysis
-        - Fundamentals
-        - Liquidity
-        - Relative strength
-        - News
-        - Gemini AI interpretation
-        - Risk analysis
-        - Confirmation signals
+        - بيانات السوق
+        - التحليل الفني
+        - التحليل الأساسي
+        - السيولة
+        - القوة النسبية
+        - الأخبار
+        - تحليل Gemini
+        - إدارة المخاطر
+        - إشارات التأكيد
         """
     )
 
-    symbol = st.text_input(
-        "Stock symbol",
-        placeholder="Example: COMI",
+    الرمز = st.text_input(
+        "رمز السهم",
+        placeholder="مثال: COMI",
     )
 
-    if st.button("Analyze Stock"):
-        if symbol.strip():
+    if st.button("تحليل السهم"):
+        if الرمز.strip():
             st.info(
-                f"Research request created for **{symbol.upper()}**. "
-                "The data engine will be connected in the next stage."
+                f"تم إنشاء طلب بحث للسهم **{الرمز.upper()}**. "
+                "سيتم ربط محرك البيانات في المرحلة التالية."
             )
         else:
-            st.warning("Enter a stock symbol first.")
+            st.warning("اكتب رمز السهم أولًا.")
 
-# -------------------------
-# Settings
-# -------------------------
+# =========================
+# الإعدادات
+# =========================
 
-elif page == "Settings":
+elif الصفحة == "الإعدادات":
 
-    st.title("Settings")
+    st.title("الإعدادات")
 
-    st.subheader("Analysis")
+    st.subheader("التحليل")
 
     st.checkbox(
-        "Show technical indicators",
+        "إظهار المؤشرات الفنية",
         value=False,
     )
 
     st.checkbox(
-        "Show detailed AI reasoning",
+        "إظهار تفاصيل تحليل الذكاء الاصطناعي",
         value=False,
     )
 
     st.checkbox(
-        "Enable Telegram daily report",
+        "تفعيل التقرير اليومي على Telegram",
         value=True,
     )
 
     st.divider()
 
-    st.subheader("System")
+    st.subheader("النظام")
 
-    st.write("Data provider: Not connected")
-    st.write("AI provider: Gemini")
-    st.write("Database: Not connected")
-    st.write("Telegram: Not connected")
+    st.write("مصدر البيانات: لم يتم الاتصال")
+    st.write("الذكاء الاصطناعي: Gemini")
+    st.write("قاعدة البيانات: لم يتم الاتصال")
+    st.write("Telegram: لم يتم الاتصال")
 
-    st.success("Application interface is ready.")
+    st.success("واجهة التطبيق جاهزة.")
