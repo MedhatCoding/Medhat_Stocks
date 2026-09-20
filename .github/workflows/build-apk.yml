@@ -1,0 +1,52 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: stable
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: flutter create --platforms=android --project-name medhat_stocks .
+
+      - name: Get packages
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: mobile
+        run: flutter analyze
+
+      - name: Build release APK
+        working-directory: mobile
+        env:
+          API_BASE: ${{ vars.API_BASE }}
+        run: |
+          if [ -z "$API_BASE" ]; then
+            API_BASE="http://10.0.2.2:8000"
+          fi
+          flutter build apk --release --dart-define=API_BASE="$API_BASE"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: medhat-stocks-android
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
