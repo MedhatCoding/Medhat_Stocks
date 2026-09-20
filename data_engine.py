@@ -663,6 +663,44 @@ class DataEngine:
                     }
         history = self.get_stock_history(index_symbol, days=220)
         if not history["success"] or len(history["data"]) < 30:
+            # Yahoo lists the EGX 30 benchmark as ^CASE30.
+            try:
+                response = requests.get(
+                    "https://query1.finance.yahoo.com/v8/finance/chart/%5ECASE30",
+                    params={"range": "2y", "interval": "1d", "events": "history"},
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=20,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                item = ((payload.get("chart") or {}).get("result") or [None])[0]
+                if item:
+                    ts = item.get("timestamp") or []
+                    q = ((item.get("indicators") or {}).get("quote") or [{}])[0]
+                    rows = []
+                    for i, stamp in enumerate(ts):
+                        closes = q.get("close") or []
+                        if i < len(closes) and closes[i] is not None:
+                            rows.append({"date": datetime.fromtimestamp(stamp, timezone.utc).strftime("%Y-%m-%d"), "close": closes[i]})
+                    rows.sort(key=lambda x: x["date"])
+                    if len(rows) >= 30:
+                        frame = self._series(rows)
+                        close = frame["close"]
+                        sma20 = close.rolling(20).mean().iloc[-1]
+                        sma50 = close.rolling(50).mean().iloc[-1]
+                        ret20 = close.pct_change(20).iloc[-1] * 100
+                        if close.iloc[-1] > sma20 > sma50 and ret20 > 0:
+                            regime = "إيجابي"
+                        elif close.iloc[-1] < sma20 < sma50 and ret20 < 0:
+                            regime = "ضعيف"
+                        else:
+                            regime = "متذبذب"
+                        return {"success": True, "available": True, "symbol": "^CASE30",
+                                "date": str(frame.iloc[-1]["date"].date()), "close": self._num(close.iloc[-1]),
+                                "sma20": self._num(sma20), "sma50": self._num(sma50),
+                                "return20": self._num(ret20), "regime": regime}
+            except (requests.RequestException, ValueError, TypeError, KeyError):
+                pass
             return {
                 "success": True,
                 "available": False,
