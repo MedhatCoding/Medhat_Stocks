@@ -1,0 +1,40 @@
+name: Validate Streamlit app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile Python files
+        run: python -m py_compile app.py data_engine.py config.py sharia_universe.py
+
+      - name: Start Streamlit
+        run: |
+          streamlit run app.py --server.headless true --server.port 8501 > /tmp/streamlit.log 2>&1 &
+          echo $! > /tmp/streamlit.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8501/_stcore/health; then
+              echo
+              echo "Streamlit health check passed."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Streamlit failed to start:"
+          cat /tmp/streamlit.log
+          exit 1
