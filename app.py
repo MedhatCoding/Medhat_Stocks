@@ -342,6 +342,84 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
  .action-title{font-size:10px}
 }
 </style>
+<style>
+/* AUTHORITATIVE APP NAVIGATION — no radio, no sidebar */
+[data-testid="stSidebar"]{display:none!important}
+.st-key-bottom_nav{
+  position:relative!important;
+  width:100%!important;
+  margin:0 0 14px!important;
+  z-index:50!important;
+}
+.st-key-bottom_nav button{
+  min-height:48px!important;
+  border-radius:12px!important;
+  background:#0d1b2c!important;
+  border:1px solid #203750!important;
+  color:#91a4b9!important;
+  font-family:'Cairo',sans-serif!important;
+  font-size:10px!important;
+  font-weight:900!important;
+  line-height:1.2!important;
+  white-space:pre-line!important;
+}
+@media(max-width:700px){
+  .main .block-container{padding-bottom:105px!important}
+  .st-key-bottom_nav{
+    position:fixed!important;
+    left:0!important;
+    right:0!important;
+    bottom:0!important;
+    width:100vw!important;
+    margin:0!important;
+    padding:7px 6px 8px!important;
+    background:#081321!important;
+    border-top:1px solid #29415c!important;
+    box-shadow:0 -14px 35px rgba(0,0,0,.55)!important;
+    z-index:999999!important;
+    direction:rtl!important;
+  }
+  .st-key-bottom_nav>div{
+    width:100%!important;
+    margin:0!important;
+  }
+  .st-key-bottom_nav [data-testid="stHorizontalBlock"]{
+    display:grid!important;
+    grid-template-columns:repeat(7,minmax(0,1fr))!important;
+    gap:3px!important;
+    width:100%!important;
+    margin:0!important;
+  }
+  .st-key-bottom_nav [data-testid="column"]{
+    width:auto!important;
+    min-width:0!important;
+    flex:1 1 0!important;
+  }
+  .st-key-bottom_nav button{
+    width:100%!important;
+    height:68px!important;
+    min-height:68px!important;
+    padding:4px 1px!important;
+    border-radius:13px!important;
+    border:1px solid transparent!important;
+    background:transparent!important;
+    color:#71869b!important;
+    font-size:8px!important;
+  }
+  .st-key-bottom_nav button:hover{
+    border-color:#24583f!important;
+    color:#83f2b5!important;
+  }
+}
+@media(min-width:701px){
+  .st-key-bottom_nav{
+    display:flex!important;
+    justify-content:flex-start!important;
+  }
+  .st-key-bottom_nav [data-testid="stHorizontalBlock"]{gap:6px!important}
+}
+</style>
+
 """,
     unsafe_allow_html=True,
 )
@@ -367,15 +445,25 @@ def app_action(icon, title, subtitle):
 # -----------------------------
 # App navigation
 # -----------------------------
-# -----------------------------
-# In-app navigation dock
-# -----------------------------
-page = st.radio(
-    "NAV",
-    ["⌂  الرئيسية","◉  السوق","⌕  تحليل","☆  المتابعة","▣  المحفظة","✦  الفرص","⚙  الإعدادات"],
-    key="mobile_page",
-    label_visibility="collapsed",
-)
+# Real app navigation: seven actual buttons in a fixed bottom dock on mobile.
+NAV_ITEMS = [
+    ("⌂", "الرئيسية"),
+    ("◉", "السوق"),
+    ("⌕", "تحليل"),
+    ("☆", "المتابعة"),
+    ("▣", "المحفظة"),
+    ("✦", "الفرص"),
+    ("⚙", "الإعدادات"),
+]
+with st.container(key="bottom_nav"):
+    nav_cols = st.columns(7, gap="small")
+    for nav_col, (icon, label) in zip(nav_cols, NAV_ITEMS):
+        with nav_col:
+            if st.button(f"{icon}\n{label}", key=f"nav_{label}", use_container_width=True):
+                st.session_state.mobile_page = f"{icon}  {label}"
+                st.rerun()
+
+page = st.session_state.mobile_page
 
 st.markdown(
     '<div class="app-topbar"><div><div class="app-name">مدحت ستوكس <span style="color:#22d47a">•</span></div>'
