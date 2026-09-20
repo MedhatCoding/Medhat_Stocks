@@ -22,6 +22,18 @@ jobs:
       - name: Generate Android project
         working-directory: mobile
         run: flutter create --platforms=android --project-name medhat_stocks .
+      - name: Align Android Kotlin toolchain
+        working-directory: mobile
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/settings.gradle")
+          s = p.read_text()
+          import re
+          s = re.sub(r'(org\\.jetbrains\\.kotlin\\.android"\\s+version\\s+")[^"]+(")', r'\\g<1>1.9.22\\g<2>', s)
+          p.write_text(s)
+          print("Kotlin plugin aligned to 1.9.22")
+          PY
       - name: Get packages
         working-directory: mobile
         run: flutter pub get
