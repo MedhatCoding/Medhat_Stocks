@@ -120,7 +120,7 @@ st.markdown(
 html,body,[class*="css"]{font-family:'Cairo',sans-serif}
 .stApp{background:#07111f;color:var(--text)}
 .main .block-container{direction:rtl;text-align:right;max-width:1180px;padding:18px 28px 100px}
-[data-testid="stSidebar"]{background:#081321;border-left:1px solid var(--line);border-right:0}
+[data-testid="stSidebar"]{display:none!important}
 [data-testid="stSidebar"]>div:first-child{padding:18px 12px}
 [data-testid="stSidebar"] *{font-family:'Cairo',sans-serif}
 .brand{padding:8px 10px 20px}.brand-title{font-size:24px;font-weight:900}.brand-sub{color:var(--muted);font-size:11px}
@@ -259,6 +259,38 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 </style>
 <style>
 /* STRUCTURAL MOBILE APP SHELL */
+.app-bottom-nav{display:none}
+@media(max-width:700px){
+ .main .block-container{padding-bottom:105px!important}
+ /* The navigation radio is now part of the page, not a sidebar. */
+ div[data-testid="stRadio"]{
+   position:fixed!important;left:0!important;right:0!important;bottom:0!important;
+   z-index:100000!important;margin:0!important;padding:5px 6px 7px!important;
+   background:rgba(8,19,33,.98)!important;border-top:1px solid #29415c!important;
+   box-shadow:0 -12px 35px rgba(0,0,0,.5)!important;
+   direction:rtl!important;
+ }
+ div[data-testid="stRadio"]>label{display:none!important}
+ div[data-testid="stRadio"] [role="radiogroup"]{
+   display:grid!important;grid-template-columns:repeat(7,1fr)!important;
+   gap:3px!important;width:100%!important;
+ }
+ div[data-testid="stRadio"] [role="radio"]{
+   display:flex!important;align-items:center!important;justify-content:center!important;
+   height:62px!important;min-height:62px!important;padding:4px 1px!important;
+   margin:0!important;border-radius:13px!important;border:1px solid transparent!important;
+   background:transparent!important;color:#71869b!important;font-size:8px!important;
+   font-weight:800!important;line-height:1.25!important;text-align:center!important;
+ }
+ div[data-testid="stRadio"] [role="radio"][aria-checked="true"]{
+   background:#102b21!important;color:#83f2b5!important;border-color:#24583f!important;
+ }
+ div[data-testid="stRadio"] [role="radio"]>div:first-child{display:none!important}
+}
+@media(max-width:390px){
+ div[data-testid="stRadio"] [role="radio"]{font-size:7px!important}
+}
+
 .m-shell{direction:rtl}
 .m-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:0 0 15px}
 .m-card{background:linear-gradient(145deg,#0f2135,#0b1726);border:1px solid #213c56;border-radius:17px;padding:14px 13px;min-height:94px;box-shadow:0 8px 22px rgba(0,0,0,.18)}
@@ -324,21 +356,15 @@ def app_action(icon, title, subtitle):
 # -----------------------------
 # App navigation
 # -----------------------------
-with st.sidebar:
-    st.markdown(
-        '<div class="brand"><div class="brand-title">📊 مدحت ستوكس</div>'
-        '<div class="brand-sub">EGX • بيانات فعلية • AI</div></div>',
-        unsafe_allow_html=True,
-    )
-    page = st.radio(
-        "NAV",
-        ["⌂  الرئيسية","◉  السوق","⌕  تحليل","☆  المتابعة","▣  المحفظة","✦  الفرص","⚙  الإعدادات"],
-        key="mobile_page",
-        label_visibility="collapsed",
-    )
-    health = data_engine.health_check()
-    state = "● متصل" if health["eodhd_configured"] else "● غير متصل"
-    st.markdown(f'<div class="nav-status">{state}</div>', unsafe_allow_html=True)
+# -----------------------------
+# In-app navigation dock
+# -----------------------------
+page = st.radio(
+    "NAV",
+    ["⌂  الرئيسية","◉  السوق","⌕  تحليل","☆  المتابعة","▣  المحفظة","✦  الفرص","⚙  الإعدادات"],
+    key="mobile_page",
+    label_visibility="collapsed",
+)
 
 st.markdown(
     '<div class="app-topbar"><div><div class="app-name">مدحت ستوكس <span style="color:#22d47a">•</span></div>'
@@ -346,6 +372,8 @@ st.markdown(
     '<div class="market-pill">● السوق</div></div>',
     unsafe_allow_html=True,
 )
+
+
 
 # -----------------------------
 # Dashboard
@@ -799,3 +827,13 @@ elif page == "⚙  الإعدادات":
         "reference_sharia_symbols": len(SHARIA_SYMBOLS),
         "checked_at": health["checked_at"],
     })
+
+<style>
+@media(min-width:701px){
+ div[data-testid="stRadio"]{margin:0 0 14px!important}
+ div[data-testid="stRadio"]>label{display:none!important}
+ div[data-testid="stRadio"] [role="radiogroup"]{display:flex!important;gap:6px!important;direction:rtl!important}
+ div[data-testid="stRadio"] [role="radio"]{padding:8px 12px!important;border-radius:12px!important;background:#0d1b2c!important;border:1px solid #203750!important;color:#91a4b9!important;font-size:11px!important;font-weight:800!important}
+ div[data-testid="stRadio"] [role="radio"][aria-checked="true"]{background:#102b21!important;color:#83f2b5!important;border-color:#24583f!important}
+ div[data-testid="stRadio"] [role="radio"]>div:first-child{display:none!important}
+</style>
