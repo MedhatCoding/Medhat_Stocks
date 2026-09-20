@@ -71,12 +71,11 @@ class DataEngine:
             return {"success": True, "data": response.json()}
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
-            detail = ""
-            try:
-                detail = exc.response.text[:250]
-            except Exception:
-                pass
-            return {"success": False, "error": f"HTTP {status or 'error'}: {detail or str(exc)}"}
+            if status == 404:
+                return {"success": False, "error": "بيانات هذا المسار غير متاحة حاليًا من مزود الأسعار."}
+            if status in (401, 403):
+                return {"success": False, "error": "مفتاح مزود بيانات الأسعار غير صالح أو غير مصرح لهذا الطلب."}
+            return {"success": False, "error": f"تعذر جلب بيانات الأسعار (HTTP {status or 'error'})."}
         except requests.RequestException as exc:
             return {"success": False, "error": str(exc)}
         except ValueError as exc:
