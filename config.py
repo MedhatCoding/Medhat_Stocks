@@ -1,0 +1,21 @@
+import os
+
+
+EODHD_API_KEY = os.getenv("EODHD_API_KEY", "")
+OANOR_API_KEY = os.getenv("OANOR_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+APP_NAME = "Medhat Stocks AI"
+
+STOCK_UNIVERSE_SIZE = 113
+
+MARKET = "EGX"
+
+TIMEZONE = "Africa/Cairo"
+
+AI_MODEL = "gemini-2.5-flash"
+
+OPPORTUNITY_SCORE_MIN = 0
+OPPORTUNITY_SCORE_MAX = 100
