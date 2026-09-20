@@ -504,6 +504,21 @@ if page == "⌂  الرئيسية":
             unsafe_allow_html=True,
         )
 
+    with st.spinner("جاري تجهيز قراءة السوق والفرص..."):
+        home_opps = data_engine.get_opportunities(limit=5)
+    if home_opps.get("success") and home_opps.get("data"):
+        st.markdown('<div class="section">الفرص الحالية</div>', unsafe_allow_html=True)
+        for row in home_opps["data"][:5]:
+            st.markdown(
+                f'<div class="m-card-grid">'
+                f'{app_card("السهم", row.get("symbol","—"), row.get("name",""))}'
+                f'{app_card("الفرصة", row.get("opportunity_score","—"), "من 100")}'
+                f'{app_card("الارتداد", row.get("rebound_score","—"), row.get("setup",""))}'
+                f'{app_card("المخاطر", row.get("risk_score","—"), "من 100")}'
+                '</div>', unsafe_allow_html=True)
+    elif home_opps.get("success"):
+        st.info("لا توجد حالياً فرصة مؤهلة وفق شروط الفحص.")
+
     if last:
         cards = [
             ("السعر", money(last["close"]), "آخر إغلاق"),
@@ -800,7 +815,7 @@ elif page == "⌕  تحليل":
             st.warning("اكتب رمز السهم أولاً.")
         else:
             with st.spinner("جاري جلب البيانات وتحليل آخر 365 جلسة..."):
-                result = data_engine.analyze_stock(selected_symbol)
+                result = data_engine.get_full_analysis(selected_symbol)
             if not result["success"]:
                 st.error(result["error"])
             else:
@@ -829,6 +844,34 @@ elif page == "⌕  تحليل":
                     unsafe_allow_html=True,
                 )
 
+                st.markdown('<div class="section">السيناريو التحليلي</div>', unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="premarket">'
+                    f'<div class="premarket-title">{result.get("setup","لا توجد إشارة كافية")}</div>'
+                    f'<div class="premarket-body">درجة الفرصة <b>{result.get("final_opportunity_score","—")}/100</b> • '
+                    f'الارتداد <b>{result.get("rebound_score","—")}/100</b> • المخاطر <b>{result.get("risk_score","—")}/100</b><br>'
+                    f'مرجع السعر: <b>{money(result.get("entry_reference"))}</b> • '
+                    f'هدف 1: <b>{money(result.get("target1"))}</b> • هدف 2: <b>{money(result.get("target2"))}</b><br>'
+                    f'إلغاء السيناريو: <b>{money(result.get("invalidation"))}</b> • '
+                    f'وقف حسابي: <b>{money(result.get("stop"))}</b> • '
+                    f'R:R: <b>{money(result.get("risk_reward"))}</b></div>'
+                    '</div>', unsafe_allow_html=True,
+                )
+
+                st.markdown('<div class="section">الأخبار</div>', unsafe_allow_html=True)
+                news_rows = result.get("news", [])
+                if news_rows:
+                    for news in news_rows[:5]:
+                        title = str(news.get("title") or "بدون عنوان").replace("<","&lt;").replace(">","&gt;")
+                        source = str(news.get("source") or "—").replace("<","&lt;").replace(">","&gt;")
+                        link = news.get("link") or ""
+                        if link:
+                            st.markdown(f'**{title}**  \n{source} • {news.get("date","—")} • [فتح الخبر]({link})')
+                        else:
+                            st.markdown(f'**{title}**  \n{source} • {news.get("date","—")}')
+                else:
+                    st.info("لا توجد أخبار متاحة لهذا السهم من مزودي البيانات الحاليين.")
+
                 st.markdown('<div class="section">ملخص التحليل</div>', unsafe_allow_html=True)
                 st.markdown(
                     '<div class="m-card-grid">'
@@ -856,8 +899,8 @@ elif page == "⌕  تحليل":
                 with b2:
                     if ai_enabled:
                         with st.spinner("جاري صياغة شرح AI..."):
-                            fundamentals = data_engine.get_company_snapshot(symbol)
-                            st.session_state.last_fundamentals = fundamentals if fundamentals["success"] else None
+                            fundamentals = result.get("fundamentals", {})
+                            st.session_state.last_fundamentals = fundamentals if fundamentals.get("success") else None
                             ai = data_engine.ai_analysis(
                                 symbol,
                                 result,
