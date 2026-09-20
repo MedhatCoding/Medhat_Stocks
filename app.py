@@ -171,6 +171,92 @@ div[data-testid="stTextInput"] input,div[data-baseweb="select"]>div{min-height:5
 }
 @media(max-width:430px){.hero-title{font-size:21px}.section{font-size:16px}.card-value{font-size:19px}}
 </style>
+<style>
+/* MOBILE APP OVERRIDE */
+@media (max-width:700px){
+/* remove the web-dashboard feel */
+header[data-testid="stHeader"]{height:0!important;background:transparent!important}
+[data-testid="stToolbar"],[data-testid="stDecoration"],footer{display:none!important}
+.main .block-container{padding:0 12px 105px!important;max-width:none!important}
+.stApp{background:#07111f!important}
+[data-testid="stSidebar"]{
+ display:block!important;position:fixed!important;z-index:100000!important;
+ left:0!important;right:0!important;bottom:0!important;top:auto!important;
+ width:100%!important;height:78px!important;max-height:78px!important;
+ background:rgba(8,19,33,.98)!important;border:0!important;
+ border-top:1px solid #29415c!important;box-shadow:0 -12px 35px rgba(0,0,0,.5)!important;
+}
+[data-testid="stSidebar"]>div:first-child{padding:3px 6px!important;height:78px!important;overflow:hidden!important}
+[data-testid="stSidebar"] .brand,
+[data-testid="stSidebar"] hr,
+[data-testid="stSidebar"] .nav-status,
+[data-testid="stSidebar"] [data-testid="stButton"]{display:none!important}
+[data-testid="stSidebar"] .stRadio{margin:0!important;padding:0!important}
+[data-testid="stSidebar"] .stRadio [role="radiogroup"]{
+ display:grid!important;grid-template-columns:repeat(5,1fr)!important;
+ gap:3px!important;width:100%!important;height:70px!important;
+}
+[data-testid="stSidebar"] .stRadio [role="radio"]{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ width:auto!important;height:64px!important;min-height:64px!important;
+ padding:5px 1px!important;margin:0!important;border-radius:13px!important;
+ border:1px solid transparent!important;background:transparent!important;
+ color:#71869b!important;font-size:9px!important;font-weight:800!important;
+ line-height:1.25!important;text-align:center!important;
+}
+[data-testid="stSidebar"] .stRadio [role="radio"][aria-checked="true"]{
+ background:#102b21!important;color:#83f2b5!important;
+ border-color:#24583f!important;box-shadow:none!important;
+}
+[data-testid="stSidebar"] .stRadio [role="radio"]>div:first-child{display:none!important}
+
+/* app header */
+.app-topbar{margin:0 -2px 12px!important;padding:12px 3px 4px!important}
+.app-name{font-size:19px!important;font-weight:900!important}
+.app-context{font-size:9px!important;color:#71869b!important}
+.market-pill{font-size:9px!important;padding:6px 9px!important}
+
+/* hero becomes app dashboard card */
+.hero{
+ margin:0 0 12px!important;padding:19px 17px!important;
+ border-radius:22px!important;border:1px solid #294764!important;
+ background:linear-gradient(145deg,#102b46,#0c1828)!important;
+ box-shadow:0 10px 28px rgba(0,0,0,.25)!important;
+}
+.hero-title{font-size:23px!important;line-height:1.35!important}
+.hero-sub{font-size:11px!important;line-height:1.8!important}
+.badge{font-size:9px!important;margin-top:11px!important}
+
+/* compact app cards */
+.section{font-size:16px!important;margin:18px 1px 8px!important}
+.card{min-height:0!important;padding:14px!important;border-radius:16px!important}
+.card-label{font-size:10px!important}
+.card-value{font-size:20px!important;margin-top:3px!important}
+.card-note{font-size:9px!important}
+.metric{padding:10px!important;border-radius:13px!important}
+.metric-name{font-size:9px!important}
+.metric-value{font-size:16px!important}
+
+/* controls */
+.search-panel{padding:12px!important;border-radius:17px!important}
+div[data-testid="stTextInput"] input,
+div[data-baseweb="select"]>div{min-height:52px!important;border-radius:14px!important;font-size:16px!important}
+div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!important}
+[data-testid="stHorizontalBlock"]{gap:7px!important}
+
+/* charts/data should fit phone */
+[data-testid="stDataFrame"]{max-width:100%!important;overflow:hidden!important}
+}
+
+/* extra small phones */
+@media (max-width:390px){
+ .main .block-container{padding-left:9px!important;padding-right:9px!important}
+ .hero{padding:17px 14px!important}
+ .hero-title{font-size:21px!important}
+ .app-name{font-size:18px!important}
+ [data-testid="stSidebar"] .stRadio [role="radio"]{font-size:8px!important}
+}
+</style>
 """,
     unsafe_allow_html=True,
 )
