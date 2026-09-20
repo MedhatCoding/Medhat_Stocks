@@ -7,6 +7,8 @@ import pandas as pd
 import requests
 import streamlit as st
 
+from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE
+
 
 def get_secret(name):
     """Read a secret from Streamlit Secrets first, then environment variables."""
@@ -409,6 +411,114 @@ class DataEngine:
             return {"success": False, "error": f"تعذر الاتصال بمحرك AI: {exc}"}
         except (ValueError, KeyError, TypeError) as exc:
             return {"success": False, "error": f"استجابة AI غير متوقعة: {exc}"}
+
+
+    def get_news(self, symbol=None, limit=8):
+        params = {"limit": max(1, min(int(limit), 20))}
+        if symbol:
+            params["s"] = self.normalize_symbol(symbol)
+        result = self._get("news", params=params, timeout=30)
+        if not result["success"]:
+            return {"success": False, "error": result["error"], "data": []}
+        rows = result["data"] if isinstance(result["data"], list) else []
+        clean = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            sentiment = row.get("sentiment") or {}
+            clean.append({
+                "date": row.get("date"),
+                "title": row.get("title") or "",
+                "content": row.get("content") or "",
+                "link": row.get("link") or "",
+                "polarity": self._num(sentiment.get("polarity")),
+                "positive": self._num(sentiment.get("pos")),
+                "negative": self._num(sentiment.get("neg")),
+            })
+        return {"success": True, "data": clean}
+
+    def get_market_context(self):
+        index_symbol = os.getenv("EGX_INDEX_SYMBOL", "EGX30")
+        history = self.get_stock_history(index_symbol, days=220)
+        if not history["success"] or len(history["data"]) < 30:
+            return {"success": False, "error": history.get("error", "تعذر قراءة حالة السوق")}
+        frame = self._series(history["data"])
+        close = frame["close"]
+        sma20 = close.rolling(20).mean().iloc[-1]
+        sma50 = close.rolling(50).mean().iloc[-1]
+        ret20 = close.pct_change(20).iloc[-1] * 100
+        if close.iloc[-1] > sma20 > sma50 and ret20 > 0:
+            regime = "إيجابي"
+        elif close.iloc[-1] < sma20 < sma50 and ret20 < 0:
+            regime = "ضعيف"
+        else:
+            regime = "متذبذب"
+        return {"success": True, "symbol": history["symbol"], "date": str(frame.iloc[-1]["date"].date()), "close": self._num(close.iloc[-1]), "sma20": self._num(sma20), "sma50": self._num(sma50), "return20": self._num(ret20), "regime": regime}
+
+    def _opportunity_setup(self, analysis, market=None, news_score=None):
+        close, rsi, ret20 = analysis.get("close"), analysis.get("rsi14"), analysis.get("return20")
+        atr, support = analysis.get("atr14"), analysis.get("support")
+        volume_ratio = analysis.get("volume_ratio")
+        rebound = 0.0
+        if rsi is not None:
+            if rsi <= 30: rebound += 28
+            elif rsi <= 35: rebound += 22
+            elif rsi <= 40: rebound += 14
+            elif rsi <= 45: rebound += 6
+        if ret20 is not None and ret20 < 0: rebound += min(20, abs(ret20) * 0.9)
+        if close and support:
+            distance = (close - support) / close * 100
+            if distance <= 3: rebound += 18
+            elif distance <= 6: rebound += 12
+            elif distance <= 10: rebound += 6
+        if volume_ratio is not None and volume_ratio >= 1.15: rebound += 10
+        if analysis.get("change_pct") is not None and analysis["change_pct"] > 0: rebound += 8
+        rebound = min(100, rebound)
+        trend = float(analysis.get("opportunity_score") or 0)
+        risk = float(analysis.get("risk_score") or 0)
+        market_adj = 8 if market and market.get("regime") == "إيجابي" else (-10 if market and market.get("regime") == "ضعيف" else 0)
+        news_adj = max(-8, min(8, news_score * 8)) if news_score is not None else 0
+        final_score = max(0, min(100, round(trend * 0.35 + rebound * 0.45 + (100-risk) * 0.20 + market_adj + news_adj)))
+        setup = "ارتداد محتمل" if rebound >= 55 else ("تحت المراقبة" if rebound >= 35 else "لا توجد إشارة ارتداد كافية")
+        target1 = close + atr if close is not None and atr else None
+        target2 = close + (2 * atr) if close is not None and atr else None
+        stop = close - (1.2 * atr) if close is not None and atr else None
+        rr = ((target1-close)/(close-stop)) if target1 is not None and stop is not None and close != stop else None
+        return {"rebound_score": round(rebound), "final_opportunity_score": final_score, "setup": setup, "entry_reference": close, "target1": target1, "target2": target2, "stop": stop, "invalidation": support * 0.98 if support else None, "risk_reward": rr, "market_regime": (market or {}).get("regime", "غير متاح"), "news_score": news_score}
+
+    @st.cache_data(ttl=900, show_spinner=False)
+    def get_opportunities(_self, limit=20):
+        import json
+        filters = [["exchange", "=", _self.EGX_EXCHANGE], ["code", "in", SHARIA_SYMBOLS], ["refund_5d_p", "<", 0]]
+        screen = _self._get("screener", {"filters": json.dumps(filters, ensure_ascii=False), "sort": "refund_5d_p.asc", "limit": 100}, timeout=40)
+        candidates = (screen.get("data") or {}).get("data", []) if screen.get("success") else []
+        if not candidates: candidates = [{"code": s} for s in SHARIA_SYMBOLS]
+        market = _self.get_market_context()
+        rows = []
+        for item in candidates[:40]:
+            symbol = str(item.get("code") or "").upper()
+            if symbol not in SHARIA_SYMBOLS: continue
+            analysis = _self.analyze_stock(symbol)
+            if not analysis.get("success"): continue
+            setup = _self._opportunity_setup(analysis, market)
+            if setup["rebound_score"] < 30: continue
+            rows.append({"symbol": symbol, "name": item.get("name") or symbol, "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE})
+        rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
+        return {"success": True, "data": rows[:max(1, min(int(limit), 40))], "count": len(rows), "market": market, "sharia_universe_count": len(SHARIA_SYMBOLS)}
+
+    def get_full_analysis(self, symbol):
+        technical = self.analyze_stock(symbol)
+        if not technical.get("success"): return technical
+        symbol_display = self.display_symbol(symbol)
+        sharia = symbol_display in SHARIA_SYMBOLS
+        fundamentals = self.get_company_snapshot(symbol_display)
+        news = self.get_news(symbol_display, limit=8)
+        news_rows = news.get("data", []) if news.get("success") else []
+        vals = [x["polarity"] for x in news_rows if x.get("polarity") is not None]
+        news_score = sum(vals) / len(vals) if vals else None
+        market = self.get_market_context()
+        setup = self._opportunity_setup(technical, market, news_score)
+        return {**technical, "sharia_compliant": sharia, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "fundamentals": fundamentals if fundamentals.get("success") else {}, "news": news_rows, **setup}
 
 
 data_engine = DataEngine()
