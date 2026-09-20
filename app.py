@@ -38,6 +38,13 @@ if "last_ai" not in st.session_state:
     st.session_state.last_ai = None
 if "last_fundamentals" not in st.session_state:
     st.session_state.last_fundamentals = None
+if "mobile_page" not in st.session_state:
+    st.session_state.mobile_page = "⌂  الرئيسية"
+if "jump_page" not in st.session_state:
+    st.session_state.jump_page = None
+if st.session_state.jump_page:
+    st.session_state.mobile_page = st.session_state.jump_page
+    st.session_state.jump_page = None
 
 
 # -----------------------------
@@ -170,6 +177,9 @@ div[data-testid="stMetric"]{background:#121820;border:1px solid #252e39;padding:
   .section{font-size:17px}
   .badge{font-size:10px}
 }
+
+.app-topbar{display:flex;align-items:center;justify-content:space-between;margin:2px 0 16px;padding:0 2px}.app-name{font-size:20px;font-weight:800;color:#fff}.app-context{font-size:10px;color:#707c8b;margin-top:1px}.market-pill{padding:7px 11px;border-radius:999px;background:#13241c;border:1px solid #244c39;color:#76e6aa;font-size:10px;font-weight:800}.nav-status{margin-top:12px;text-align:center;color:#657181;font-size:10px;padding:8px;border-top:1px solid #202832}
+@media (max-width:700px){.main .block-container{padding:10px 12px 96px}.app-name{font-size:18px}.hero{padding:18px 16px}.hero-title{font-size:24px}.card{min-height:92px}.card-value{font-size:21px}.section{font-size:17px}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -177,45 +187,43 @@ div[data-testid="stMetric"]{background:#121820;border:1px solid #252e39;padding:
 
 
 # -----------------------------
-# Sidebar
+# App navigation
 # -----------------------------
 with st.sidebar:
     st.markdown(
-        '<div class="brand"><div class="brand-title">📊 مدحت ستوكس AI</div>'
-        '<div class="brand-sub">تحليل EGX • فلترة شرعية • بيانات فعلية</div></div>',
+        '<div class="brand"><div class="brand-title">📊 مدحت ستوكس</div>'
+        '<div class="brand-sub">EGX • بيانات فعلية • AI</div></div>',
         unsafe_allow_html=True,
     )
-    st.divider()
-
     page = st.radio(
         "NAV",
-        [
-            "⌂  لوحة التحكم",
-            "◉  السوق",
-            "✦  الفرص",
-            "☆  قائمة المتابعة",
-            "▣  المحفظة",
-            "⌕  البحث والتحليل",
-            "⚙  الإعدادات",
-        ],
+        ["⌂  الرئيسية","◉  السوق","⌕  تحليل","☆  المتابعة","▣  المحفظة"],
+        key="mobile_page",
         label_visibility="collapsed",
     )
-
-    st.divider()
+    if st.button("✦  الفرص", key="nav_opportunities", use_container_width=True):
+        st.session_state.jump_page = "✦  الفرص"
+        st.rerun()
+    if st.button("⚙  الإعدادات", key="nav_settings", use_container_width=True):
+        st.session_state.jump_page = "⚙  الإعدادات"
+        st.rerun()
     health = data_engine.health_check()
-    if health["eodhd_configured"]:
-        st.markdown('<span class="badge">● EODHD متصل</span>', unsafe_allow_html=True)
-    else:
-        st.markdown('<span class="badge red">● EODHD غير متصل</span>', unsafe_allow_html=True)
-    st.caption(f"الإصدار {APP_VERSION} • الهدف: {STOCK_UNIVERSE_SIZE} سهم")
+    state = "● متصل" if health["eodhd_configured"] else "● غير متصل"
+    st.markdown(f'<div class="nav-status">{state}</div>', unsafe_allow_html=True)
 
+st.markdown(
+    '<div class="app-topbar"><div><div class="app-name">مدحت ستوكس</div>'
+    '<div class="app-context">EGX • تحليل ذكي</div></div>'
+    '<div class="market-pill">● السوق</div></div>',
+    unsafe_allow_html=True,
+)
 
 # -----------------------------
 # Dashboard
 # -----------------------------
-if page == "⌂  لوحة التحكم":
+if page == "⌂  الرئيسية":
     st.markdown(
-        '<div class="hero"><div class="hero-title">مدحت ستوكس AI</div>'
+        '<div class="hero"><div class="hero-title">مدحت ستوكس</div>'
         '<div class="hero-sub">منصة EGX حديثة — بيانات فعلية، قراءة ذكية، وتجربة سريعة وواضحة بدون زحمة.</div>'
         '<span class="badge">● النظام جاهز للتحليل</span></div>',
         unsafe_allow_html=True,
@@ -265,6 +273,17 @@ if page == "⌂  لوحة التحكم":
         st.info("قراءة كمية للبيانات المتاحة فقط — بدون أوامر شراء أو بيع.")
     else:
         st.info("لم يتم تشغيل تحليل بعد. افتح «البحث والتحليل» واكتب رمز سهم مثل SWDY أو EGAL.")
+
+    st.markdown('<div class="section">الوصول السريع</div>', unsafe_allow_html=True)
+    q1, q2 = st.columns(2)
+    with q1:
+        if st.button("⌕  تحليل سهم", use_container_width=True):
+            st.session_state.jump_page = "⌕  تحليل"
+            st.rerun()
+    with q2:
+        if st.button("✦  استكشف الفرص", use_container_width=True):
+            st.session_state.jump_page = "✦  الفرص"
+            st.rerun()
 
     st.markdown('<div class="section">كيف تعمل المنصة</div>', unsafe_allow_html=True)
     a, b, c = st.columns(3)
@@ -348,7 +367,7 @@ elif page == "✦  الفرص":
 # -----------------------------
 # Watchlist
 # -----------------------------
-elif page == "☆  قائمة المتابعة":
+elif page == "☆  المتابعة":
     st.markdown(
         '<div class="hero"><div class="hero-title">قائمة المتابعة</div>'
         '<div class="hero-sub">قائمة محلية داخل جلسة التطبيق. لا تحتاج قاعدة بيانات لتجربة النسخة الحالية.</div></div>',
@@ -433,7 +452,7 @@ elif page == "▣  المحفظة":
 # -----------------------------
 # Research / analysis
 # -----------------------------
-elif page == "⌕  البحث والتحليل":
+elif page == "⌕  تحليل":
     st.markdown(
         '<div class="hero"><div class="hero-title">البحث والتحليل</div>'
         '<div class="hero-sub">ابحث بالرمز أو اسم الشركة. البيانات من السوق أولاً، ثم التحليل الكمي، ثم شرح AI عند الطلب.</div></div>',
