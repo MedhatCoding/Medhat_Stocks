@@ -354,6 +354,7 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 .strip-chip{background:#0d1b2c;border:1px solid #203750;border-radius:13px;padding:9px 11px;min-width:92px}
 .strip-symbol{font-size:11px;font-weight:900;color:#fff}
 .strip-value{font-size:10px;color:#7eeeb0;margin-top:2px}
+.scenario-mini{background:#0a1624;border:1px solid #203750;border-radius:14px;padding:11px 13px;margin:8px 0 12px;color:#c8d6e5;font-size:11px;line-height:1.9}.scenario-mini b{color:#fff}
 .premarket{background:linear-gradient(135deg,#0d2a20,#0b1d19);border:1px solid #276046;border-right:4px solid #22d47a;border-radius:19px;padding:15px;margin:0 0 15px}
 .premarket-title{font-size:13px;font-weight:900;color:#eafff3}
 .premarket-time{font-size:10px;color:#82b69c;margin-top:3px}
@@ -487,6 +488,13 @@ def price_card(label, price, change=None, note=""):
         f'<div class="m-value">{money(price)} <span class="price-change {tone}">{change_text}</span></div>'
         f'<div class="m-note">{note}</div></div>'
     )
+
+def company_display_name(result, fallback="الشركة"):
+    fundamentals = result.get("fundamentals") or {}
+    name = fundamentals.get("name")
+    if name and str(name).strip():
+        return str(name).strip()
+    return fallback
 
 def friendly_error(message):
     text = str(message or "")
@@ -696,9 +704,10 @@ elif page == "✦  الفرص":
             sharia = row.get("sharia_compliant") is True
             st.markdown(
                 f'<div class="m-card-grid">'
-                f'{app_card("السهم", symbol, row.get("name",""))}'
-                f'{app_card("درجة الفرصة", row.get("opportunity_score","—"), "من 100")}'
-                f'{app_card("الارتداد", row.get("rebound_score","—"), row.get("setup",""))}'
+                f'{app_card("الشركة", row.get("name","اسم الشركة غير متاح"), "رمز التداول: " + symbol)}'
+                f'{price_card("السعر الحالي", row.get("close"), row.get("change_pct"), "آخر سعر متاح")}'
+                f'{app_card("نسبة التغير", pct(row.get("change_pct")), "الجلسة الأخيرة", value_class(row.get("change_pct")))}'
+                f'{app_card("الفرصة", row.get("opportunity_score","—"), "من 100")}'
                 f'{app_card("المخاطر", row.get("risk_score","—"), "من 100")}'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -812,8 +821,9 @@ elif page == "▣  المحفظة":
             if value is not None:
                 total_value += value
             rows.append({
-                "السهم": pos["symbol"], "الكمية": pos["qty"], "متوسط التكلفة": money(pos["avg"]),
-                "السعر": money(price), "القيمة": money(value), "الربح/الخسارة": money(pnl),
+                "الشركة/السهم": pos["symbol"], "الكمية": pos["qty"], "متوسط الدخول": money(pos["avg"]),
+                "السعر الحالي": money(price), "التغير %": pct(latest.get("change_pct")) if latest.get("success") else "—",
+                "القيمة الحالية": money(value), "الربح/الخسارة": money(pnl),
             })
             if st.button(f"✕ إزالة {pos['symbol']}", key=f"portfolio_remove_{pos['symbol']}_{i}", use_container_width=True):
                 st.session_state.portfolio.pop(i)
@@ -887,8 +897,8 @@ elif page == "⌕  تحليل":
                 status_text = "✓ موجود في القائمة الشرعية المرجعية" if sharia_ok else "⚠ غير موجود في القائمة الشرعية المرجعية"
 
                 st.markdown(
-                    f'<div class="hero"><div class="hero-title">{symbol}</div>'
-                    f'<div class="hero-sub">آخر جلسة متاحة: {result["date"]}</div>'
+                    f'<div class="hero"><div class="hero-title">{company_display_name(result, "اسم الشركة غير متاح")}</div>'
+                    f'<div class="hero-sub">رمز التداول: {symbol} • آخر جلسة متاحة: {result["date"]}</div>'
                     f'<span class="badge {status_class}">{status_text}</span></div>',
                     unsafe_allow_html=True,
                 )
