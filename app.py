@@ -913,8 +913,8 @@ elif page == "⌕  تحليل":
             else:
                 st.session_state.last_analysis = result
                 st.session_state.last_ai = None
-                # analysis_query is a Streamlit widget key and has already been instantiated above.
-                # Do not mutate it after st.text_input; keep the selected symbol in local state.
+                # IMPORTANT: analysis_query belongs to st.text_input and must never be
+                # assigned after that widget has been created. Keep navigation state separate.
                 st.session_state.prefill_symbol = result["symbol"].replace(".EGX", "")
                 symbol = result["symbol"].replace(".EGX", "")
                 sharia_ok = sharia_status(symbol)
