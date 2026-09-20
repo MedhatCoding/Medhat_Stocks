@@ -50,24 +50,14 @@ def main():
         raise RuntimeError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are required.")
 
     engine = DataEngine()
-    market = engine.get_market_context()
-    if not market.get("success"):
-        print("Market context unavailable. No message.")
+    report = engine.get_premarket_report(limit=12)
+    if not report.get("success"):
+        print(f"Pre-market report unavailable: {report.get('error', 'unknown error')}")
         return
 
-    # This is a pre-market report: use the latest completed EGX session
-    # available before the opening, rather than requiring today's session data.
-    latest_market_date = str(market.get("date", ""))
-    if not latest_market_date and not force:
-        print("No latest EGX market date available. No message.")
-        return
-
-    result = engine.get_opportunities(limit=12)
-    if not result.get("success"):
-        raise RuntimeError(result.get("error", "Opportunity scan failed"))
-
+    market = report.get("market", {})
     rows = [
-        row for row in result.get("data", [])
+        row for row in report.get("opportunities", [])
         if row.get("sharia_compliant") is True
         and float(row.get("opportunity_score") or 0) >= MIN_SCORE
         and float(row.get("rebound_score") or 0) >= MIN_REBOUND
@@ -75,6 +65,7 @@ def main():
     ]
     rows.sort(key=lambda row: float(row.get("opportunity_score") or 0), reverse=True)
 
+    # Explicit requirement: no message when there is no qualified opportunity.
     if not rows:
         print("No qualifying Sharia-compliant opportunity today. No message sent.")
         return
@@ -82,7 +73,7 @@ def main():
     lines = [
         "📊 <b>مدحت ستوكس — فرص EGX قبل الافتتاح</b>",
         f"📅 {html.escape(now.strftime('%Y-%m-%d'))} — {html.escape(now.strftime('%H:%M'))} القاهرة",
-        f"📚 آخر جلسة مكتملة بالبيانات: <b>{html.escape(latest_market_date)}</b>",
+        f"📚 آخر جلسة مكتملة: <b>{html.escape(str(report.get('latest_session_date', 'غير متاح')))}</b>",
         f"📈 حالة السوق: <b>{html.escape(str(market.get('regime', 'غير متاح')))}</b>",
         "",
     ]
@@ -97,17 +88,17 @@ def main():
         news_text = "غير متاح" if news is None else f"{float(news):+.2f}"
         setup = html.escape(str(row.get("setup", "—")))
         lines.append(
-            f"<b>{index}. {symbol}</b> — فرصة {score}/100
-"
-            f"ارتداد {rebound}/100 • مخاطر {risk}/100 • RSI {rsi}
-"
+            f"<b>{index}. {symbol}</b> — فرصة {score}/100\n"
+            f"ارتداد {rebound}/100 • مخاطر {risk}/100 • RSI {rsi}\n"
             f"الأخبار {news_text} • {setup}"
         )
         lines.append("")
 
-    lines.append("⚠️ <i>هذه مرشحات تحليلية قبل الافتتاح وليست أمراً بالشراء أو البيع. البيانات الفعلية فقط، ولا تُرسل رسالة عند عدم وجود فرصة مؤهلة.</i>")
-    send_telegram(token, chat_id, "
-".join(lines))
+    lines.append(
+        "⚠️ <i>هذه مرشحات تحليلية قبل الافتتاح وليست أمراً بالشراء أو البيع. "
+        "البيانات الفعلية فقط، ولا تُرسل رسالة عند عدم وجود فرصة مؤهلة.</i>"
+    )
+    send_telegram(token, chat_id, "\n".join(lines))
     print(f"Telegram sent: {len(rows[:5])} opportunities.")
 
 
