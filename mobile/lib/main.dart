@@ -13,8 +13,30 @@ class Api{
 class App extends StatefulWidget{const App({super.key});@override State<App>createState()=>_AppState();}
 class _AppState extends State<App>{bool dark=true;@override void initState(){super.initState();SharedPreferences.getInstance().then((p){if(mounted)setState(()=>dark=p.getBool('dark')??true);});}Future<void>theme(bool v)async{final p=await SharedPreferences.getInstance();await p.setBool('dark',v);if(mounted)setState(()=>dark=v);}@override Widget build(BuildContext c)=>MaterialApp(debugShowCheckedModeBanner:false,title:'مدحت ستوكس',locale:const Locale('ar'),supportedLocales:const[Locale('ar')],themeMode:dark?ThemeMode.dark:ThemeMode.light,theme:ThemeData(useMaterial3:true,colorScheme:ColorScheme.fromSeed(seedColor:const Color(0xFF0B8F87))),darkTheme:ThemeData(useMaterial3:true,brightness:Brightness.dark,colorScheme:ColorScheme.fromSeed(seedColor:const Color(0xFF0B8F87),brightness:Brightness.dark)),home:Shell(onTheme:theme));}
 class Shell extends StatefulWidget{final Future<void>Function(bool)onTheme;const Shell({super.key,required this.onTheme});@override State<Shell>createState()=>_ShellState();}
-class _ShellState extends State<Shell>{int i=0;@override Widget build(BuildContext c){final p=[Home(go:(x)=>setState(()=>i=x)),const Opportunities(),const Search(),const Watchlist(),const Portfolio()];return Scaffold(drawer:Drawer(child:SafeArea(child:ListView(children:[const DrawerHeader(child:Text('مدحت ستوكس',style:TextStyle(fontSize:26,fontWeight:FontWeight.w900))),_d(c,'الفرص',1,Icons.bolt),_d(c,'تحليل سهم',2,Icons.search),_d(c,'المتابعة',3,Icons.star),_d(c,'المحفظة',4,Icons.account_balance_wallet),SwitchListTile.adaptive(value:Theme.of(c).brightness==Brightness.dark,onChanged:widget.onTheme,title:const Text('الوضع الداكن'))])),body:SafeArea(child:IndexedStack(index:i,children:p)),bottomNavigationBar:NavigationBar(selectedIndex:i,onDestinationSelected:(x)=>setState(()=>i=x),destinations:const[NavigationDestination(icon:Icon(Icons.home_outlined),label:'الرئيسية'),NavigationDestination(icon:Icon(Icons.bolt_outlined),label:'الفرص'),NavigationDestination(icon:Icon(Icons.search),label:'تحليل'),NavigationDestination(icon:Icon(Icons.star_outline),label:'المتابعة'),NavigationDestination(icon:Icon(Icons.account_balance_wallet_outlined),label:'المحفظة')]));}}
-Widget _d(BuildContext c,String s,int i,IconData x)=>ListTile(leading:Icon(x),title:Text(s),onTap:(){Navigator.pop(c);(c.findAncestorStateOfType<_ShellState>()!).setState(()=> (c.findAncestorStateOfType<_ShellState>()!).i=i);});
+class _ShellState extends State<Shell>{
+ int i=0;
+ @override Widget build(BuildContext c){
+  final pages=[Home(go:(x)=>setState(()=>i=x)),const Opportunities(),const Search(),const Watchlist(),const Portfolio()];
+  return Scaffold(
+   drawer:Drawer(child:SafeArea(child:ListView(children:[
+    const DrawerHeader(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(Icons.auto_graph,size:42),SizedBox(height:10),Text('مدحت ستوكس',style:TextStyle(fontSize:25,fontWeight:FontWeight.w900)),Text('مساعد شخصي لتحليل EGX')])),
+    ListTile(leading:const Icon(Icons.bolt),title:const Text('الفرص'),onTap:(){Navigator.pop(c);setState(()=>i=1);}),
+    ListTile(leading:const Icon(Icons.search),title:const Text('تحليل سهم'),onTap:(){Navigator.pop(c);setState(()=>i=2);}),
+    ListTile(leading:const Icon(Icons.star),title:const Text('المتابعة'),onTap:(){Navigator.pop(c);setState(()=>i=3);}),
+    ListTile(leading:const Icon(Icons.account_balance_wallet),title:const Text('المحفظة'),onTap:(){Navigator.pop(c);setState(()=>i=4);}),
+    SwitchListTile.adaptive(value:Theme.of(c).brightness==Brightness.dark,onChanged:widget.onTheme,title:const Text('الوضع الداكن'),secondary:const Icon(Icons.dark_mode_outlined)),
+   ]))),
+   body:SafeArea(child:IndexedStack(index:i,children:pages)),
+   bottomNavigationBar:NavigationBar(selectedIndex:i,onDestinationSelected:(x)=>setState(()=>i=x),destinations:const[
+    NavigationDestination(icon:Icon(Icons.home_outlined),label:'الرئيسية'),
+    NavigationDestination(icon:Icon(Icons.bolt_outlined),label:'الفرص'),
+    NavigationDestination(icon:Icon(Icons.search),label:'تحليل'),
+    NavigationDestination(icon:Icon(Icons.star_outline),label:'المتابعة'),
+    NavigationDestination(icon:Icon(Icons.account_balance_wallet_outlined),label:'المحفظة'),
+   ]),
+  );
+ }
+}
 class Home extends StatefulWidget{final ValueChanged<int>go;const Home({super.key,required this.go});@override State<Home>createState()=>_HomeState();}
 class _HomeState extends State<Home>{Map<String,dynamic>?m;List<dynamic>o=[];@override void initState(){super.initState();load();}Future<void>load()async{try{final r=await Future.wait([Api.get('/market/context'),Api.get('/opportunities?limit=5')]);if(mounted)setState(() { m=r[0]; o=r[1]['data']??[]; });}catch(_){}}@override Widget build(BuildContext c)=>RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(18),children:[Row(children:[Builder(builder:(x)=>IconButton(onPressed:()=>Scaffold.of(x).openDrawer(),icon:const Icon(Icons.menu,size:28))),const Expanded(child:Text('مدحت ستوكس',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900))),IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),const SizedBox(height:14),Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('حالة السوق'),Text(m?['regime']?.toString()??'—',style:const TextStyle(fontSize:30,fontWeight:FontWeight.w900)),Text('العائد 20 جلسة: '+fmt(m?['return20'])+'%')] ))),const SizedBox(height:20),Row(children:[const Expanded(child:Text('أهم الفرص',style:TextStyle(fontSize:21,fontWeight:FontWeight.w900))),TextButton(onPressed:()=>widget.go(1),child:const Text('الكل'))]),...o.map((x)=>Opportunity(Map<String,dynamic>.from(x))),const SizedBox(height:10),Row(children:[Expanded(child:Act('تحليل سهم',Icons.search,()=>widget.go(2))),const SizedBox(width:10),Expanded(child:Act('المتابعة',Icons.star,()=>widget.go(3)))]) ]));}
 class Opportunities extends StatefulWidget{const Opportunities({super.key});@override State<Opportunities>createState()=>_OState();}
