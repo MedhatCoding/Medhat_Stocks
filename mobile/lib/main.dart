@@ -1,164 +1,38 @@
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() => runApp(const MedhatStocksApp());
-
-class MedhatStocksApp extends StatelessWidget {
-  const MedhatStocksApp({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Medhat Stocks',
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0B0D12),
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6C63FF), brightness: Brightness.dark),
-        fontFamily: 'sans',
-      ),
-      home: const HomeShell(),
-    );
-  }
+void main()=>runApp(const App());
+class Api{
+ static const base=String.fromEnvironment('API_BASE',defaultValue:'http://10.0.2.2:8000');
+ static Future<dynamic> get(String p)async{final r=await http.get(Uri.parse(base+p)).timeout(const Duration(seconds:35));final b=jsonDecode(r.body);if(r.statusCode>=400)throw Exception(b['detail']??'تعذر الاتصال');return b;}
+ static Future<dynamic> post(String p)async{final r=await http.post(Uri.parse(base+p)).timeout(const Duration(seconds:50));final b=jsonDecode(r.body);if(r.statusCode>=400)throw Exception(b['detail']??'تعذر الاتصال');return b;}
 }
-
-class Api {
-  static const base = String.fromEnvironment('API_BASE', defaultValue: 'http://10.0.2.2:8000');
-  static Future<Map<String,dynamic>> get(String path) async {
-    final r = await http.get(Uri.parse('$base$path'));
-    if (r.statusCode >= 400) throw Exception(jsonDecode(r.body)['detail'] ?? 'تعذر الاتصال');
-    return jsonDecode(r.body) as Map<String,dynamic>;
-  }
+class App extends StatefulWidget{const App({super.key});@override State<App>createState()=>_AppState();}
+class _AppState extends State<App>{bool dark=true;@override void initState(){super.initState();SharedPreferences.getInstance().then((p){if(mounted)setState(()=>dark=p.getBool('dark')??true);});}Future<void>theme(bool v)async{final p=await SharedPreferences.getInstance();await p.setBool('dark',v);if(mounted)setState(()=>dark=v);}@override Widget build(BuildContext c)=>MaterialApp(debugShowCheckedModeBanner:false,title:'مدحت ستوكس',locale:const Locale('ar'),supportedLocales:const[Locale('ar')],themeMode:dark?ThemeMode.dark:ThemeMode.light,theme:ThemeData(useMaterial3:true,colorScheme:ColorScheme.fromSeed(seedColor:const Color(0xFF0B8F87))),darkTheme:ThemeData(useMaterial3:true,brightness:Brightness.dark,colorScheme:ColorScheme.fromSeed(seedColor:const Color(0xFF0B8F87),brightness:Brightness.dark)),home:Shell(onTheme:theme));}
+class Shell extends StatefulWidget{final Future<void>Function(bool)onTheme;const Shell({super.key,required this.onTheme});@override State<Shell>createState()=>_ShellState();}
+class _ShellState extends State<Shell>{int i=0;@override Widget build(BuildContext c){final p=[Home(go:(x)=>setState(()=>i=x)),const Opportunities(),const Search(),const Watchlist(),const Portfolio()];return Scaffold(drawer:Drawer(child:SafeArea(child:ListView(children:[const DrawerHeader(child:Text('مدحت ستوكس',style:TextStyle(fontSize:26,fontWeight:FontWeight.w900))),_d(c,'الفرص',1,Icons.bolt),_d(c,'تحليل سهم',2,Icons.search),_d(c,'المتابعة',3,Icons.star),_d(c,'المحفظة',4,Icons.account_balance_wallet),SwitchListTile.adaptive(value:Theme.of(c).brightness==Brightness.dark,onChanged:widget.onTheme,title:const Text('الوضع الداكن'))])),body:SafeArea(child:IndexedStack(index:i,children:p)),bottomNavigationBar:NavigationBar(selectedIndex:i,onDestinationSelected:(x)=>setState(()=>i=x),destinations:const[NavigationDestination(icon:Icon(Icons.home_outlined),label:'الرئيسية'),NavigationDestination(icon:Icon(Icons.bolt_outlined),label:'الفرص'),NavigationDestination(icon:Icon(Icons.search),label:'تحليل'),NavigationDestination(icon:Icon(Icons.star_outline),label:'المتابعة'),NavigationDestination(icon:Icon(Icons.account_balance_wallet_outlined),label:'المحفظة')]));}}
+Widget _d(BuildContext c,String s,int i,IconData x)=>ListTile(leading:Icon(x),title:Text(s),onTap:(){Navigator.pop(c);(c.findAncestorStateOfType<_ShellState>()!).setState(()=> (c.findAncestorStateOfType<_ShellState>()!).i=i);});
+class Home extends StatefulWidget{final ValueChanged<int>go;const Home({super.key,required this.go});@override State<Home>createState()=>_HomeState();}
+class _HomeState extends State<Home>{Map<String,dynamic>?m;List<dynamic>o=[];@override void initState(){super.initState();load();}Future<void>load()async{try{final r=await Future.wait([Api.get('/market/context'),Api.get('/opportunities?limit=5')]);if(mounted)setState(()=>{m=r[0],o=r[1]['data']??[]});}catch(_){}}@override Widget build(BuildContext c)=>RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(18),children:[Row(children:[Builder(builder:(x)=>IconButton(onPressed:()=>Scaffold.of(x).openDrawer(),icon:const Icon(Icons.menu,size:28))),const Expanded(child:Text('مدحت ستوكس',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900))),IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),const SizedBox(height:14),Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('حالة السوق'),Text(m?['regime']?.toString()??'—',style:const TextStyle(fontSize:30,fontWeight:FontWeight.w900)),Text('العائد 20 جلسة: '+fmt(m?['return20'])+'%')] ))),const SizedBox(height:20),Row(children:[const Expanded(child:Text('أهم الفرص',style:TextStyle(fontSize:21,fontWeight:FontWeight.w900))),TextButton(onPressed:()=>widget.go(1),child:const Text('الكل'))]),...o.map((x)=>Opportunity(Map<String,dynamic>.from(x))),const SizedBox(height:10),Row(children:[Expanded(child:Act('تحليل سهم',Icons.search,()=>widget.go(2))),const SizedBox(width:10),Expanded(child:Act('المتابعة',Icons.star,()=>widget.go(3)))]) ]));}
+class Opportunities extends StatefulWidget{const Opportunities({super.key});@override State<Opportunities>createState()=>_OState();}
+class _OState extends State<Opportunities>{List<dynamic>r=[];@override void initState(){super.initState();load();}Future<void>load()async{try{final x=await Api.get('/opportunities?limit=40');if(mounted)setState(()=>r=x['data']??[]);}catch(_){}}@override Widget build(BuildContext c)=>RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(18),children:[const Text('الفرص',style:TextStyle(fontSize:29,fontWeight:FontWeight.w900)),const Text('شريعة فقط • ترتيب تنازلي • تشبع بيعي وارتداد وسوق وأخبار'),const SizedBox(height:16),...r.map((x)=>Opportunity(Map<String,dynamic>.from(x))) ]));}
+class Opportunity extends StatelessWidget{final Map<String,dynamic>x;const Opportunity(this.x,{super.key});@override Widget build(BuildContext c)=>Card(child:ListTile(leading:CircleAvatar(child:Text(x['symbol'].toString()[0])),title:Text(x['symbol'].toString(),style:const TextStyle(fontWeight:FontWeight.w900)),subtitle:Text('RSI '+fmt(x['rsi14'])+' • ارتداد '+fmt(x['rebound_score'])+' • مخاطر '+fmt(x['risk_score'])),trailing:Text(fmt(x['opportunity_score']),style:TextStyle(fontWeight:FontWeight.w900,color:Theme.of(c).colorScheme.primary)),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Details(symbol:x['symbol'].toString(),name:x['name']?.toString()??'')))));}
+class Search extends StatefulWidget{const Search({super.key});@override State<Search>createState()=>_SState();}
+class _SState extends State<Search>{final q=TextEditingController();List<dynamic>r=[];Future<void>s()async{try{final x=await Api.get('/stocks/search?q='+Uri.encodeQueryComponent(q.text));if(mounted)setState(()=>r=x['data']??[]);}catch(_){}}@override Widget build(BuildContext c)=>ListView(padding:const EdgeInsets.all(18),children:[const Text('تحليل سهم',style:TextStyle(fontSize:29,fontWeight:FontWeight.w900)),TextField(controller:q,onSubmitted:(_)=>s(),decoration:const InputDecoration(hintText:'رمز أو اسم الشركة',prefixIcon:Icon(Icons.search))),const SizedBox(height:10),FilledButton(onPressed:s,child:const Text('بحث')),...r.map((x)=>ListTile(title:Text(x['symbol'].toString()),subtitle:Text(x['name']?.toString()??''),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Details(symbol:x['symbol'].toString(),name:x['name']?.toString()??'')))))]);}
+class Details extends StatefulWidget{final String symbol,name;const Details({super.key,required this.symbol,required this.name});@override State<Details>createState()=>_DState();}
+class _DState extends State<Details>{Map<String,dynamic>?d;String?ai;bool busy=false;@override void initState(){super.initState();load();}Future<void>load()async{try{final x=await Api.get('/stocks/'+widget.symbol+'/full-analysis');if(mounted)setState(()=>d=x);}catch(_){}}Future<void>run()async{setState(()=>busy=true);try{final x=await Api.post('/stocks/'+widget.symbol+'/ai-analysis');if(mounted)setState(()=>ai=x['text']?.toString());}catch(e){if(mounted)setState(()=>ai='تعذر تشغيل AI: '+e.toString());}finally{if(mounted)setState(()=>busy=false);}}@override Widget build(BuildContext c){if(d==null)return const Scaffold(body:Center(child:CircularProgressIndicator()));return Scaffold(appBar:AppBar(title:Text(widget.symbol)),body:RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(18),children:[Text(widget.name),Text(fmt(d!['close']),style:const TextStyle(fontSize:38,fontWeight:FontWeight.w900)),Text(fmt(d!['change_pct'])+'%',style:TextStyle(color:(numVal(d!['change_pct'])??0)>=0?Colors.green:Colors.red)),Info('مؤشر الشريعة',Text(d!['sharia_compliant']==true?'متوافق مع المرجع الشرعي':'غير موجود في المرجع الشرعي؛ لا يدخل الفرص')),Info('خلاصة الفرصة',Column(children:[Row(children:[Stat('الفرصة',d!['final_opportunity_score']),Stat('الارتداد',d!['rebound_score']),Stat('المخاطر',d!['risk_score'])]),Text('السوق: '+(d!['market_regime']??'—').toString()+' • الأخبار: '+fmt(d!['news_score']))])),Info('المستويات',Wrap(spacing:16,runSpacing:12,children:[Stat('دعم',d!['support']),Stat('مقاومة',d!['resistance']),Stat('هدف1',d!['target1']),Stat('هدف2',d!['target2']),Stat('إيقاف',d!['stop']),Stat('R/R',d!['risk_reward'])])),Info('التحليل الفني',Column(children:[_row('RSI',d!['rsi14']),_row('SMA20',d!['sma20']),_row('SMA50',d!['sma50']),_row('SMA200',d!['sma200']),_row('ATR',d!['atr14']),_row('العائد20',d!['return20']),_row('التذبذب',d!['volatility20'])])),Info('الأساسيات',Column(children:[_row('القطاع',d!['fundamentals']?['sector']),_row('P/E',d!['fundamentals']?['pe']),_row('EPS',d!['fundamentals']?['eps'])])),Info('الأخبار',Column(children:[...(d!['news'] as List???[]).take(5).map((n)=>ListTile(contentPadding:EdgeInsets.zero,title:Text(n['title']?.toString()??'',maxLines:2,overflow:TextOverflow.ellipsis),subtitle:Text((n['date']??'').toString()+' • '+fmt(n['polarity']))))])),Info('AI',Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[if(ai!=null)Text(ai!),if(ai==null)const Text('شرح AI عند الطلب دون اختلاق أرقام أو إصدار أمر شراء/بيع.'),FilledButton(onPressed:busy?null:run,child:Text(busy?'جاري التحليل…':'تشغيل AI'))]))])));}
 }
-
-class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
-  @override State<HomeShell> createState() => _HomeShellState();
-}
-class _HomeShellState extends State<HomeShell> {
-  int tab = 0;
-  final pages = const [Dashboard(), MarketPage(), SearchPage(), WatchlistPage(), PortfolioPage()];
-  @override Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(child: pages[tab]),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tab,
-        onDestinationSelected: (i)=>setState(()=>tab=i),
-        backgroundColor: const Color(0xFF11141B),
-        indicatorColor: const Color(0xFF292449),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'الرئيسية'),
-          NavigationDestination(icon: Icon(Icons.show_chart), label: 'السوق'),
-          NavigationDestination(icon: Icon(Icons.search), label: 'تحليل'),
-          NavigationDestination(icon: Icon(Icons.star_border), selectedIcon: Icon(Icons.star), label: 'المتابعة'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), label: 'المحفظة'),
-        ],
-      ),
-    );
-  }
-}
-
-class Dashboard extends StatelessWidget {
-  const Dashboard({super.key});
-  @override Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-    children: [
-      Row(children: [
-        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('مدحت ستوكس', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
-          SizedBox(height: 5), Text('EGX • تحليل ذكي', style: TextStyle(color: Colors.white54)),
-        ])),
-        CircleAvatar(backgroundColor: const Color(0xFF211E38), child: Icon(Icons.auto_graph, color: Colors.white)),
-      ]),
-      const SizedBox(height: 24),
-      Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: const LinearGradient(colors:[Color(0xFF29234D),Color(0xFF171A27)])),
-        child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('السوق المصري', style: TextStyle(color: Colors.white70)),
-          SizedBox(height: 10), Text('حلّل السهم قبل القرار', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-          SizedBox(height: 8), Text('بيانات حقيقية • مؤشرات فنية • أساسيات • شرح بالذكاء الاصطناعي', style: TextStyle(color: Colors.white60)),
-        ]),
-      ),
-      const SizedBox(height: 18),
-      Row(children: [
-        Expanded(child: _Action(icon: Icons.search, title:'ابحث عن سهم', onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const SearchPage())))),
-        const SizedBox(width:12),
-        Expanded(child: _Action(icon: Icons.bolt, title:'الفرص', onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const MarketPage())))),
-      ]),
-      const SizedBox(height: 24),
-      const Text('ابدأ التحليل', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 12),
-      const StockCard(symbol:'COMI', name:'Commercial International Bank'),
-    ],
-  );
-}
-
-class _Action extends StatelessWidget {
-  final IconData icon; final String title; final VoidCallback onTap;
-  const _Action({required this.icon,required this.title,required this.onTap});
-  @override Widget build(BuildContext context)=>InkWell(onTap:onTap,borderRadius:BorderRadius.circular(18),child:Container(padding:const EdgeInsets.symmetric(vertical:18,horizontal:14),decoration:BoxDecoration(color:const Color(0xFF151820),borderRadius:BorderRadius.circular(18),border:Border.all(color:Colors.white10)),child:Row(children:[Icon(icon,color:const Color(0xFF9C92FF)),const SizedBox(width:10),Expanded(child:Text(title,style:const TextStyle(fontWeight:FontWeight.w700)))])));
-}
-
-class StockCard extends StatefulWidget {
-  final String symbol,name;
-  const StockCard({super.key,required this.symbol,required this.name});
-  @override State<StockCard> createState()=>_StockCardState();
-}
-class _StockCardState extends State<StockCard> {
-  Map<String,dynamic>? data; String? error;
-  @override void initState(){super.initState();load();}
-  Future<void> load() async { try { final d=await Api.get('/stocks/${widget.symbol}/latest'); if(mounted)setState(()=>data=d); } catch(e){if(mounted)setState(()=>error=e.toString());}}
-  @override Widget build(BuildContext context){
-    final price=data?['close']; final ch=data?['change_pct'];
-    return Card(color:const Color(0xFF151820),margin:EdgeInsets.zero,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(20)),child:InkWell(
-      onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StockDetails(symbol:widget.symbol,name:widget.name))),
-      borderRadius:BorderRadius.circular(20),child:Padding(padding:const EdgeInsets.all(18),child:Row(children:[
-        CircleAvatar(radius:25,backgroundColor:const Color(0xFF25213E),child:Text(widget.symbol[0],style:const TextStyle(fontWeight:FontWeight.bold))),
-        const SizedBox(width:14),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(widget.symbol,style:const TextStyle(fontWeight:FontWeight.w800,fontSize:17)),Text(widget.name,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white54))])),
-        Column(crossAxisAlignment:CrossAxisAlignment.end,children:[Text(price==null?'—':price.toString(),style:const TextStyle(fontSize:18,fontWeight:FontWeight.w800)),Text(ch==null?'—':'${double.parse(ch.toString()).toStringAsFixed(2)}%',style:TextStyle(color:(ch??0)>=0?Colors.greenAccent:Colors.redAccent,fontWeight:FontWeight.w700))])
-      ]))));
-  }
-}
-
-class MarketPage extends StatelessWidget {
-  const MarketPage({super.key});
-  @override Widget build(BuildContext context)=>const _Page(title:'السوق',child:StockCard(symbol:'COMI',name:'Commercial International Bank'));
-}
-class WatchlistPage extends StatelessWidget {
-  const WatchlistPage({super.key});
-  @override Widget build(BuildContext context)=>const _Page(title:'المتابعة',child:Column(children:[Text('قائمة المتابعة محفوظة محليًا على الجهاز.'),SizedBox(height:16),StockCard(symbol:'COMI',name:'Commercial International Bank')]));
-}
-class PortfolioPage extends StatelessWidget {
-  const PortfolioPage({super.key});
-  @override Widget build(BuildContext context)=>const _Page(title:'المحفظة',child:Text('أضف الأسهم والكميات لمتابعة قيمة محفظتك.'));
-}
-class SearchPage extends StatefulWidget {
-  const SearchPage({super.key});
-  @override State<SearchPage> createState()=>_SearchPageState();
-}
-class _SearchPageState extends State<SearchPage>{
-  final c=TextEditingController(); List<dynamic> results=[]; bool loading=false;
-  Future<void> search() async {if(c.text.trim().isEmpty)return;setState(()=>loading=true);try{final d=await Api.get('/stocks/search?q=${Uri.encodeQueryComponent(c.text.trim())}');setState(()=>results=d['data']??[]);}catch(_){setState(()=>results=[]);}finally{if(mounted)setState(()=>loading=false);}}
-  @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.all(20),children:[
-    const Text('تحليل سهم',style:TextStyle(fontSize:28,fontWeight:FontWeight.w800)),const SizedBox(height:18),
-    TextField(controller:c,onSubmitted:(_)=>search(),decoration:InputDecoration(hintText:'ابحث بالرمز أو اسم الشركة',prefixIcon:const Icon(Icons.search),filled:true,fillColor:const Color(0xFF151820),border:OutlineInputBorder(borderRadius:BorderRadius.circular(18),borderSide:BorderSide.none))),
-    const SizedBox(height:12),FilledButton.icon(onPressed:loading?null:search,icon:const Icon(Icons.search),label:const Text('بحث'),style:FilledButton.styleFrom(minimumSize:const Size.fromHeight(52),shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(16)))),
-    const SizedBox(height:18),...results.map((x)=>ListTile(title:Text(x['symbol']??''),subtitle:Text(x['name']??''),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StockDetails(symbol:x['symbol'],name:x['name'])))))
-  ]);
-}
-class StockDetails extends StatefulWidget {final String symbol,name;const StockDetails({super.key,required this.symbol,required this.name});@override State<StockDetails> createState()=>_StockDetailsState();}
-class _StockDetailsState extends State<StockDetails>{
- Map<String,dynamic>? a; Map<String,dynamic>? p; String? error;
- @override void initState(){super.initState();load();}
- Future<void> load() async {try{final vals=await Future.wait([Api.get('/stocks/${widget.symbol}/latest'),Api.get('/stocks/${widget.symbol}/analysis')]);if(mounted)setState(() { p = vals[0]; a = vals[1]; });}catch(e){if(mounted)setState(()=>error=e.toString());}}
- @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.symbol),backgroundColor:Colors.transparent),body:ListView(padding:const EdgeInsets.all(20),children:[
-   Text(widget.name,style:const TextStyle(color:Colors.white54)),const SizedBox(height:18),
-   Text(p?['close']?.toString()??'—',style:const TextStyle(fontSize:40,fontWeight:FontWeight.w900)),Text(p?['change_pct']==null?'—':'${double.parse(p!['change_pct'].toString()).toStringAsFixed(2)}%',style:TextStyle(color:(p?['change_pct']??0)>=0?Colors.greenAccent:Colors.redAccent,fontSize:18,fontWeight:FontWeight.bold)),
-   const SizedBox(height:22),if(error!=null)Text(error!,style:const TextStyle(color:Colors.redAccent)),
-   if(a!=null)...[_metric('الحالة',a!['status']),_metric('درجة الفرصة',a!['opportunity_score']),_metric('درجة المخاطر',a!['risk_score']),_metric('RSI 14',a!['rsi14']),_metric('دعم',a!['support']),_metric('مقاومة',a!['resistance'])],
- ]));
-}
-Widget _metric(String k,d)=>Card(color:const Color(0xFF151820),child:ListTile(title:Text(k),trailing:Text(d?.toString()??'—',style:const TextStyle(fontWeight:FontWeight.w800))));
-class _Page extends StatelessWidget{final String title;final Widget child;const _Page({required this.title,required this.child});@override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.all(20),children:[Text(title,style:const TextStyle(fontSize:28,fontWeight:FontWeight.w800)),const SizedBox(height:18),child]);}
+Widget _row(String a,d)=>ListTile(contentPadding:EdgeInsets.zero,title:Text(a),trailing:Text(fmt(d),style:const TextStyle(fontWeight:FontWeight.w800)));
+class Watchlist extends StatefulWidget{const Watchlist({super.key});@override State<Watchlist>createState()=>_WState();}
+class _WState extends State<Watchlist>{List<String>a=[];@override void initState(){super.initState();SharedPreferences.getInstance().then((p){if(mounted)setState(()=>a=p.getStringList('watchlist')??[]);});}Future<void>save()async{final p=await SharedPreferences.getInstance();await p.setStringList('watchlist',a);setState((){});}@override Widget build(BuildContext c)=>ListView(padding:const EdgeInsets.all(18),children:[const Text('المتابعة',style:TextStyle(fontSize:29,fontWeight:FontWeight.w900)),if(a.isEmpty)const Box('قائمة المتابعة فارغة.')else...a.map((s)=>ListTile(title:Text(s),trailing:IconButton(onPressed:(){a.remove(s);save();},icon:const Icon(Icons.delete_outline)),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Details(symbol:s,name:s)))))]);}
+class Portfolio extends StatefulWidget{const Portfolio({super.key});@override State<Portfolio>createState()=>_PState();}
+class _PState extends State<Portfolio>{List<Map<String,dynamic>>a=[];@override void initState(){super.initState();SharedPreferences.getInstance().then((p){final x=p.getString('portfolio');if(x!=null&&mounted)setState(()=>a=(jsonDecode(x)as List).map((e)=>Map<String,dynamic>.from(e)).toList());});}@override Widget build(BuildContext c)=>ListView(padding:const EdgeInsets.all(18),children:[const Text('المحفظة',style:TextStyle(fontSize:29,fontWeight:FontWeight.w900)),if(a.isEmpty)const Box('لم تضف مراكز بعد.')else...a.map((x)=>ListTile(title:Text(x['symbol'].toString()),subtitle:Text('كمية '+fmt(x['qty'])+' • تكلفة '+fmt(x['avg']))))]);}
+class Info extends StatelessWidget{final String t;final Widget w;const Info(this.t,this.w,{super.key});@override Widget build(BuildContext c)=>Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(t,style:const TextStyle(fontWeight:FontWeight.w900,fontSize:17)),const SizedBox(height:10),w])));}
+class Box extends StatelessWidget{final String t;const Box(this.t,{super.key});@override Widget build(BuildContext c)=>Info('معلومة',Text(t));}
+class Stat extends StatelessWidget{final String t;final dynamic v;const Stat(this.t,this.v,{super.key});@override Widget build(BuildContext c)=>Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(t,style:const TextStyle(fontSize:10)),Text(fmt(v),style:const TextStyle(fontWeight:FontWeight.w900))]));}
+class Act extends StatelessWidget{final String t;final IconData i;final VoidCallback f;const Act(this.t,this.i,this.f,{super.key});@override Widget build(BuildContext c)=>Card(child:InkWell(onTap:f,child:Padding(padding:const EdgeInsets.all(18),child:Row(children:[Icon(i,color:Theme.of(c).colorScheme.primary),const SizedBox(width:8),Text(t,style:const TextStyle(fontWeight:FontWeight.w800))]))));}
+num?numVal(dynamic v)=>v is num?v.toDouble():double.tryParse(v?.toString()??'');
+String fmt(dynamic v){final n=numVal(v);return n==null?'—':n.abs()>=1000?n.toStringAsFixed(0):n.toStringAsFixed(2);}
