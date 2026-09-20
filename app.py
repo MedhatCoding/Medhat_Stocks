@@ -574,16 +574,18 @@ if page == "⌂  الرئيسية":
             for row in premarket["opportunities"][:5]:
                 st.markdown(
                     '<div class="m-card-grid">'
-                    f'{app_card("السهم", row.get("symbol","—"), row.get("name",""))}'
+                    f'{app_card("الشركة", data_engine.arabic_company_name(row.get("symbol","—"), row.get("name","اسم الشركة غير متاح")), "رمز التداول: " + row.get("symbol","—"))}'
                     f'{app_card("الفرصة", row.get("opportunity_score","—"), "من 100")}'
                     f'{app_card("الارتداد", row.get("rebound_score","—"), row.get("setup",""))}'
                     f'{app_card("المخاطر", row.get("risk_score","—"), "من 100")}'
                     '</div>',
                     unsafe_allow_html=True,
                 )
-                if st.button(f'⌕ تحليل {row.get("symbol","")}', key=f'home_analyze_{row.get("symbol","")}', use_container_width=True):
+                if st.button(f'🔎 تحليل السهم', key=f'home_analyze_{row.get("symbol","")}', use_container_width=True, type="primary"):
                     st.session_state.mobile_page = "⌕  تحليل"
                     st.session_state.prefill_symbol = row.get("symbol","")
+                    st.session_state.analysis_query = row.get("symbol","")
+                    st.session_state.analysis_autorun = True
                     st.rerun()
         else:
             st.info("لا توجد حالياً فرصة تستوفي شروط الفحص؛ التطبيق لا يعرض فرصة مصطنعة.")
@@ -727,6 +729,7 @@ elif page == "✦  الفرص":
             with a1:
                 if st.button("🔎 تحليل السهم", key=f"opp_analyze_{symbol}_{i}", use_container_width=True, type="primary"):
                     st.session_state.prefill_symbol = symbol
+                    st.session_state.analysis_query = symbol
                     st.session_state.analysis_autorun = True
                     st.session_state.mobile_page = "⌕  تحليل"
                     st.rerun()
@@ -744,8 +747,12 @@ elif page == "✦  الفرص":
 
         st.markdown('<div class="section">كل نتائج الفحص</div>', unsafe_allow_html=True)
         table = pd.DataFrame(opportunities["data"])
+        if "symbol" in table.columns:
+            table["اسم الشركة"] = table["symbol"].apply(
+                lambda s: data_engine.arabic_company_name(s, str(s))
+            )
         cols = [c for c in [
-            "symbol", "name", "opportunity_score", "rebound_score", "risk_score",
+            "اسم الشركة", "symbol", "opportunity_score", "rebound_score", "risk_score",
             "rsi14", "return20", "volume_ratio", "news_score", "setup"
         ] if c in table.columns]
         st.dataframe(table[cols], use_container_width=True, hide_index=True)
@@ -868,7 +875,11 @@ elif page == "⌕  تحليل":
     )
 
     st.markdown('<div class="search-panel">', unsafe_allow_html=True)
-    query = st.text_input("ابحث عن السهم", value=st.session_state.get("prefill_symbol", ""), placeholder="مثال: SWDY أو EGAL", label_visibility="visible")
+    if "analysis_query" not in st.session_state:
+        st.session_state.analysis_query = st.session_state.get("prefill_symbol", "")
+    elif st.session_state.get("prefill_symbol") and not st.session_state.get("analysis_query"):
+        st.session_state.analysis_query = st.session_state.prefill_symbol
+    query = st.text_input("ابحث عن السهم", key="analysis_query", placeholder="مثال: SWDY أو EGAL", label_visibility="visible")
     suggestions = data_engine.search_symbols(query) if query else []
     if suggestions:
         st.caption("اقتراحات من قائمة EGX:")
@@ -903,6 +914,7 @@ elif page == "⌕  تحليل":
                 st.session_state.last_analysis = result
                 st.session_state.last_ai = None
                 st.session_state.prefill_symbol = result["symbol"].replace(".EGX", "")
+                st.session_state.analysis_query = result["symbol"].replace(".EGX", "")
                 symbol = result["symbol"].replace(".EGX", "")
                 sharia_ok = sharia_status(symbol)
 
