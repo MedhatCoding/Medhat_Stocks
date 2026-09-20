@@ -1,11 +1,15 @@
 import os
+import re
+from datetime import datetime, timedelta, timezone
+
+import numpy as np
+import pandas as pd
 import requests
 import streamlit as st
-from datetime import datetime, timezone
 
 
 def get_secret(name):
-    """قراءة المفتاح من Streamlit Secrets أو متغيرات البيئة."""
+    """Read a secret from Streamlit Secrets first, then environment variables."""
     try:
         value = st.secrets.get(name, "")
         if value:
@@ -16,7 +20,7 @@ def get_secret(name):
 
 
 class DataEngine:
-    """محرك بيانات البورصة المصرية."""
+    """EGX data + technical analysis engine."""
 
     BASE_URL = "https://eodhd.com/api"
     EGX_EXCHANGE = "EGX"
@@ -24,74 +28,144 @@ class DataEngine:
     def __init__(self):
         self.eodhd_api_key = get_secret("EODHD_API_KEY")
         self.oanor_api_key = get_secret("OANOR_API_KEY")
+        self.gemini_api_key = get_secret("GEMINI_API_KEY")
+        self.gemini_model = get_secret("GEMINI_MODEL") or "gemini-2.5-flash"
+
+    @staticmethod
+    def normalize_symbol(symbol):
+        value = (symbol or "").strip().upper()
+        value = re.sub(r"\s+", "", value)
+        if not value:
+            return ""
+        if "." not in value:
+            value = f"{value}.EGX"
+        return value
+
+    @staticmethod
+    def display_symbol(symbol):
+        return (symbol or "").split(".")[0].upper()
 
     def health_check(self):
         return {
             "eodhd_configured": bool(self.eodhd_api_key),
             "oanor_configured": bool(self.oanor_api_key),
+            "gemini_configured": bool(self.gemini_api_key),
             "checked_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    def get_egx_symbols(self):
+    def _get(self, path, params=None, timeout=30):
         if not self.eodhd_api_key:
-            return {"success": False, "error": "EODHD_API_KEY غير موجود", "data": []}
-
-        url = f"{self.BASE_URL}/exchange-symbol-list/{self.EGX_EXCHANGE}"
+            return {"success": False, "error": "EODHD_API_KEY غير موجود"}
+        query = dict(params or {})
+        query["api_token"] = self.eodhd_api_key
+        query.setdefault("fmt", "json")
         try:
             response = requests.get(
-                url,
-                params={"api_token": self.eodhd_api_key, "fmt": "json"},
-                timeout=30,
+                f"{self.BASE_URL}/{path.lstrip('/')}",
+                params=query,
+                timeout=timeout,
             )
             response.raise_for_status()
             return {"success": True, "data": response.json()}
+        except requests.HTTPError as exc:
+            status = getattr(exc.response, "status_code", None)
+            detail = ""
+            try:
+                detail = exc.response.text[:250]
+            except Exception:
+                pass
+            return {"success": False, "error": f"HTTP {status or 'error'}: {detail or str(exc)}"}
         except requests.RequestException as exc:
-            return {"success": False, "error": str(exc), "data": []}
+            return {"success": False, "error": str(exc)}
+        except ValueError as exc:
+            return {"success": False, "error": f"استجابة غير صالحة من مزود البيانات: {exc}"}
 
-    def get_stock_history(self, symbol, days=365):
-        if not self.eodhd_api_key:
-            return {"success": False, "error": "EODHD_API_KEY غير موجود", "data": []}
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def get_egx_symbols(_self):
+        result = _self._get(f"exchange-symbol-list/{_self.EGX_EXCHANGE}")
+        if not result["success"]:
+            return result
+        data = result["data"]
+        if not isinstance(data, list):
+            return {"success": False, "error": "قائمة EGX غير صالحة", "data": []}
+        cleaned = []
+        for row in data:
+            if isinstance(row, dict):
+                code = str(row.get("Code") or row.get("code") or "").upper()
+                name = row.get("Name") or row.get("name") or ""
+                if code:
+                    cleaned.append({"code": code, "name": str(name)})
+        return {"success": True, "data": cleaned}
 
-        symbol = symbol.upper().strip()
-        if "." not in symbol:
-            symbol = f"{symbol}.{self.EGX_EXCHANGE}"
+    def search_symbols(self, query, limit=12):
+        query = (query or "").strip().upper()
+        if not query:
+            return []
+        result = self.get_egx_symbols()
+        if not result["success"]:
+            return []
+        rows = result["data"]
+        ranked = []
+        for row in rows:
+            code = row["code"].upper()
+            name = row["name"].upper()
+            if code == query:
+                rank = 0
+            elif code.startswith(query):
+                rank = 1
+            elif query in code:
+                rank = 2
+            elif query in name:
+                rank = 3
+            else:
+                continue
+            ranked.append((rank, code, row["name"]))
+        ranked.sort(key=lambda x: (x[0], x[1]))
+        return [{"symbol": code, "name": name} for _, code, name in ranked[:limit]]
 
-        url = f"{self.BASE_URL}/eod/{symbol}"
-        try:
-            response = requests.get(
-                url,
-                params={
-                    "api_token": self.eodhd_api_key,
-                    "fmt": "json",
-                    "period": "d",
-                    "order": "d",
-                },
-                timeout=30,
-            )
-            response.raise_for_status()
-            data = response.json()
-            if isinstance(data, list):
-                data = data[:days]
-            return {"success": True, "symbol": symbol, "data": data}
-        except requests.RequestException as exc:
-            return {
-                "success": False,
-                "symbol": symbol,
-                "error": str(exc),
-                "data": [],
-            }
+    @st.cache_data(ttl=900, show_spinner=False)
+    def get_stock_history(_self, symbol, days=365):
+        normalized = _self.normalize_symbol(symbol)
+        if not normalized:
+            return {"success": False, "error": "رمز السهم غير صالح", "data": []}
+        result = _self._get(
+            f"eod/{normalized}",
+            {"period": "d", "order": "d"},
+            timeout=30,
+        )
+        if not result["success"]:
+            return {"success": False, "symbol": normalized, "error": result["error"], "data": []}
+        data = result["data"]
+        if not isinstance(data, list):
+            return {"success": False, "symbol": normalized, "error": "لا توجد بيانات تاريخية", "data": []}
+        return {"success": True, "symbol": normalized, "data": data[:max(30, int(days))]}
+
+    @st.cache_data(ttl=900, show_spinner=False)
+    def get_fundamentals(_self, symbol):
+        normalized = _self.normalize_symbol(symbol)
+        if not normalized:
+            return {"success": False, "error": "رمز السهم غير صالح", "data": {}}
+        result = _self._get(f"v1.1/fundamentals/{normalized}", timeout=30)
+        if not result["success"]:
+            return {"success": False, "symbol": normalized, "error": result["error"], "data": {}}
+        data = result["data"]
+        return {"success": True, "symbol": normalized, "data": data if isinstance(data, dict) else {}}
 
     def get_latest_price(self, symbol):
-        result = self.get_stock_history(symbol, days=1)
+        result = self.get_stock_history(symbol, days=5)
         if not result["success"] or not result["data"]:
             return {
                 "success": False,
-                "symbol": symbol,
+                "symbol": self.normalize_symbol(symbol),
                 "price": None,
                 "error": result.get("error", "لا توجد بيانات"),
             }
-
         row = result["data"][0]
+        previous = result["data"][1] if len(result["data"]) > 1 else {}
+        close = self._num(row.get("close"))
+        prev_close = self._num(previous.get("close"))
+        change = close - prev_close if close is not None and prev_close is not None else None
+        change_pct = (change / prev_close * 100) if change is not None and prev_close else None
         return {
             "success": True,
             "symbol": result["symbol"],
@@ -101,7 +175,240 @@ class DataEngine:
             "low": row.get("low"),
             "close": row.get("close"),
             "volume": row.get("volume"),
+            "previous_close": previous.get("close"),
+            "change": change,
+            "change_pct": change_pct,
         }
+
+    @staticmethod
+    def _num(value):
+        try:
+            if value is None or value == "":
+                return None
+            number = float(value)
+            return number if np.isfinite(number) else None
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _series(data):
+        frame = pd.DataFrame(data or [])
+        if frame.empty:
+            return frame
+        for col in ["open", "high", "low", "close", "adjusted_close", "volume"]:
+            if col in frame:
+                frame[col] = pd.to_numeric(frame[col], errors="coerce")
+        frame["date"] = pd.to_datetime(frame.get("date"), errors="coerce")
+        frame = frame.dropna(subset=["date", "close"]).sort_values("date").reset_index(drop=True)
+        return frame
+
+    def analyze_stock(self, symbol):
+        history = self.get_stock_history(symbol, days=365)
+        if not history["success"] or not history["data"]:
+            return {"success": False, "error": history.get("error", "لا توجد بيانات")}
+
+        frame = self._series(history["data"])
+        if len(frame) < 30:
+            return {"success": False, "error": "البيانات التاريخية المتاحة أقل من 30 جلسة"}
+
+        close = frame["close"]
+        volume = frame["volume"] if "volume" in frame else pd.Series(dtype=float)
+
+        frame["sma20"] = close.rolling(20).mean()
+        frame["sma50"] = close.rolling(50).mean()
+        frame["sma200"] = close.rolling(200).mean()
+        delta = close.diff()
+        gain = delta.clip(lower=0).rolling(14).mean()
+        loss = (-delta.clip(upper=0)).rolling(14).mean()
+        rs = gain / loss.replace(0, np.nan)
+        frame["rsi14"] = 100 - (100 / (1 + rs))
+        tr_parts = [
+            frame["high"] - frame["low"],
+            (frame["high"] - frame["close"].shift()).abs(),
+            (frame["low"] - frame["close"].shift()).abs(),
+        ]
+        frame["atr14"] = pd.concat(tr_parts, axis=1).max(axis=1).rolling(14).mean()
+        frame["return_20d"] = close.pct_change(20) * 100
+        frame["return_60d"] = close.pct_change(60) * 100
+        frame["volatility20"] = close.pct_change().rolling(20).std() * np.sqrt(252) * 100
+        if not volume.empty:
+            frame["volume_avg20"] = volume.rolling(20).mean()
+            frame["volume_ratio"] = volume / frame["volume_avg20"]
+        else:
+            frame["volume_avg20"] = np.nan
+            frame["volume_ratio"] = np.nan
+
+        latest = frame.iloc[-1]
+        last_close = self._num(latest["close"])
+        sma20 = self._num(latest.get("sma20"))
+        sma50 = self._num(latest.get("sma50"))
+        sma200 = self._num(latest.get("sma200"))
+        rsi = self._num(latest.get("rsi14"))
+        atr = self._num(latest.get("atr14"))
+        ret20 = self._num(latest.get("return_20d"))
+        ret60 = self._num(latest.get("return_60d"))
+        vol20 = self._num(latest.get("volatility20"))
+        vol_ratio = self._num(latest.get("volume_ratio"))
+
+        recent = frame.tail(60)
+        support = self._num(recent["low"].min())
+        resistance = self._num(recent["high"].max())
+
+        trend_points = 0
+        if last_close is not None and sma20 is not None:
+            trend_points += 20 if last_close > sma20 else 0
+        if last_close is not None and sma50 is not None:
+            trend_points += 20 if last_close > sma50 else 0
+        if sma20 is not None and sma50 is not None:
+            trend_points += 15 if sma20 > sma50 else 0
+        if sma50 is not None and sma200 is not None:
+            trend_points += 15 if sma50 > sma200 else 0
+        if ret20 is not None:
+            trend_points += 10 if ret20 > 0 else 0
+        if ret60 is not None:
+            trend_points += 10 if ret60 > 0 else 0
+        if rsi is not None:
+            trend_points += 10 if 45 <= rsi <= 68 else (5 if 35 <= rsi < 45 else 0)
+
+        risk_points = 0
+        if vol20 is not None:
+            risk_points += min(35, max(0, vol20 - 15))
+        if rsi is not None and rsi > 75:
+            risk_points += 25
+        if atr is not None and last_close:
+            risk_points += min(25, (atr / last_close) * 100)
+        if vol_ratio is not None and vol_ratio < 0.5:
+            risk_points += 15
+        risk_score = int(min(100, round(risk_points)))
+        opportunity_score = int(max(0, min(100, round(trend_points - risk_score * 0.35 + 25))))
+
+        if risk_score >= 70:
+            status = "مخاطر مرتفعة"
+        elif opportunity_score >= 75 and risk_score < 45:
+            status = "إيجابي"
+        elif opportunity_score >= 55:
+            status = "مراقبة"
+        else:
+            status = "محايد"
+
+        chart = frame.tail(120)[["date", "close", "sma20", "sma50", "sma200"]].copy()
+        chart["date"] = chart["date"].dt.strftime("%Y-%m-%d")
+
+        return {
+            "success": True,
+            "symbol": history["symbol"],
+            "date": str(latest["date"].date()),
+            "close": last_close,
+            "open": self._num(latest.get("open")),
+            "high": self._num(latest.get("high")),
+            "low": self._num(latest.get("low")),
+            "volume": self._num(latest.get("volume")),
+            "previous_close": self._num(frame.iloc[-2]["close"]) if len(frame) > 1 else None,
+            "change_pct": ((last_close / self._num(frame.iloc[-2]["close"]) - 1) * 100) if len(frame) > 1 and self._num(frame.iloc[-2]["close"]) else None,
+            "sma20": sma20,
+            "sma50": sma50,
+            "sma200": sma200,
+            "rsi14": rsi,
+            "atr14": atr,
+            "return20": ret20,
+            "return60": ret60,
+            "volatility20": vol20,
+            "volume_ratio": vol_ratio,
+            "support": support,
+            "resistance": resistance,
+            "opportunity_score": opportunity_score,
+            "risk_score": risk_score,
+            "status": status,
+            "history_rows": len(frame),
+            "chart": chart,
+        }
+
+    def get_company_snapshot(self, symbol):
+        result = self.get_fundamentals(symbol)
+        if not result["success"]:
+            return result
+        data = result["data"]
+        general = data.get("General", {}) if isinstance(data, dict) else {}
+        highlights = data.get("Highlights", {}) if isinstance(data, dict) else {}
+        valuation = data.get("Valuation", {}) if isinstance(data, dict) else {}
+        return {
+            "success": True,
+            "symbol": result["symbol"],
+            "name": general.get("Name") or general.get("NameLong") or self.display_symbol(result["symbol"]),
+            "description": general.get("Description") or "",
+            "sector": general.get("Sector") or "—",
+            "industry": general.get("Industry") or "—",
+            "currency": general.get("CurrencyCode") or "EGP",
+            "market_cap": highlights.get("MarketCapitalization"),
+            "pe": highlights.get("PERatio"),
+            "eps": highlights.get("EarningsShare"),
+            "dividend_yield": highlights.get("DividendYield"),
+            "book_value": highlights.get("BookValue"),
+            "beta": highlights.get("Beta"),
+            "valuation_pe": valuation.get("TrailingPE") or valuation.get("ForwardPE"),
+        }
+
+    def ai_analysis(self, symbol, technical, fundamentals=None):
+        if not self.gemini_api_key:
+            return {"success": False, "error": "GEMINI_API_KEY غير موجود"}
+        payload = {
+            "السهم": self.display_symbol(symbol),
+            "التاريخ": technical.get("date"),
+            "السعر": technical.get("close"),
+            "التغير": technical.get("change_pct"),
+            "RSI14": technical.get("rsi14"),
+            "SMA20": technical.get("sma20"),
+            "SMA50": technical.get("sma50"),
+            "SMA200": technical.get("sma200"),
+            "العائد20جلسة": technical.get("return20"),
+            "العائد60جلسة": technical.get("return60"),
+            "التذبذب_السنوي_التقريبي": technical.get("volatility20"),
+            "نسبة_الحجم": technical.get("volume_ratio"),
+            "الدعم": technical.get("support"),
+            "المقاومة": technical.get("resistance"),
+            "درجة_الفرصة_الحسابية": technical.get("opportunity_score"),
+            "درجة_المخاطر_الحسابية": technical.get("risk_score"),
+            "القطاع": (fundamentals or {}).get("sector", "غير متاح"),
+            "القيمة_السوقية": (fundamentals or {}).get("market_cap"),
+            "مكرر_الربحية": (fundamentals or {}).get("pe"),
+        }
+        system = (
+            "أنت محلل أسواق مالية مساعد. حلل البيانات المعطاة فقط ولا تخترع أرقاماً. "
+            "اكتب بالعربية المصرية المهنية المختصرة. لا تعطِ أمراً بالشراء أو البيع ولا تتنبأ بسعر. "
+            "قسّم الرد إلى: الملخص، الاتجاه الفني، نقاط القوة، المخاطر، ما يجب مراقبته. "
+            "اذكر بوضوح أن التحليل معلوماتي وليس توصية استثمارية."
+        )
+        body = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": system + "\n\nبيانات السهم:\n" + pd.Series(payload).to_json(force_ascii=False)}
+                    ]
+                }
+            ],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 900},
+        }
+        try:
+            response = requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_model}:generateContent",
+                params={"key": self.gemini_api_key},
+                json=body,
+                timeout=45,
+            )
+            response.raise_for_status()
+            data = response.json()
+            text = ""
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                text = "\n".join(str(p.get("text", "")) for p in parts if p.get("text"))
+            if not text:
+                return {"success": False, "error": "لم يُرجع Gemini نصاً"}
+            return {"success": True, "text": text}
+        except requests.RequestException as exc:
+            return {"success": False, "error": f"تعذر الاتصال بمحرك AI: {exc}"}
+        except (ValueError, KeyError, TypeError) as exc:
+            return {"success": False, "error": f"استجابة AI غير متوقعة: {exc}"}
 
 
 data_engine = DataEngine()
