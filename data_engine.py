@@ -258,6 +258,45 @@ class DataEngine:
         ranked.sort(key=lambda x: (x[0], x[1]))
         return [{"symbol": code, "name": name} for _, code, name in ranked[:limit]]
 
+    def _yahoo_history(self, symbol, period="2y"):
+        """Fallback EGX daily history via Yahoo Finance when EODHD is unavailable."""
+        code = self.display_symbol(symbol)
+        yahoo_symbol = f"{code}.CA"
+        try:
+            response = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}",
+                params={"range": period, "interval": "1d", "events": "history"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=20,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            result = (payload.get("chart") or {}).get("result") or []
+            if not result:
+                return {"success": False, "error": "لا توجد بيانات تاريخية لهذا السهم من المصدر البديل.", "data": []}
+            item = result[0]
+            timestamps = item.get("timestamp") or []
+            quote = ((item.get("indicators") or {}).get("quote") or [{}])[0]
+            rows = []
+            for i, ts in enumerate(timestamps):
+                def at(key):
+                    values = quote.get(key) or []
+                    return values[i] if i < len(values) else None
+                if at("close") is None:
+                    continue
+                rows.append({
+                    "date": datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d"),
+                    "open": at("open"), "high": at("high"), "low": at("low"),
+                    "close": at("close"), "volume": at("volume"),
+                })
+            rows.sort(key=lambda x: x["date"], reverse=True)
+            meta = item.get("meta") or {}
+            return {"success": bool(rows), "symbol": self.normalize_symbol(symbol),
+                    "data": rows, "name_en": meta.get("longName") or meta.get("shortName") or "",
+                    "provider": "Yahoo Finance fallback"}
+        except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
+            return {"success": False, "symbol": self.normalize_symbol(symbol), "error": str(exc), "data": []}
+
     @st.cache_data(ttl=900, show_spinner=False)
     def get_stock_history(_self, symbol, days=365):
         normalized = _self.normalize_symbol(symbol)
@@ -269,6 +308,9 @@ class DataEngine:
             timeout=30,
         )
         if not result["success"]:
+            fallback = _self._yahoo_history(normalized)
+            if fallback.get("success"):
+                return fallback
             return {"success": False, "symbol": normalized, "error": result["error"], "data": []}
         data = result["data"]
         if not isinstance(data, list):
@@ -603,6 +645,22 @@ class DataEngine:
 
     def get_market_context(self):
         index_symbol = os.getenv("EGX_INDEX_SYMBOL", "EGX30")
+        if self.oanor_api_key:
+            idx = self._oanor_get("egx-api/v1/index", timeout=15)
+            if idx.get("success"):
+                payload = idx.get("data") or {}
+                row = payload.get("data") if isinstance(payload, dict) else payload
+                if isinstance(row, list):
+                    row = row[0] if row else {}
+                if isinstance(row, dict):
+                    return {
+                        "success": True, "available": True, "symbol": "EGX30",
+                        "date": row.get("date") or row.get("timestamp"),
+                        "close": self._num(row.get("value") or row.get("close") or row.get("price")),
+                        "sma20": None, "sma50": None,
+                        "return20": self._num(row.get("change_pct") or row.get("changePercent")),
+                        "regime": "بيانات EGX30 الحالية متاحة",
+                    }
         history = self.get_stock_history(index_symbol, days=220)
         if not history["success"] or len(history["data"]) < 30:
             return {
