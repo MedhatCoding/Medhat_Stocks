@@ -677,7 +677,8 @@ class DataEngine:
             news_score = (sum(polarities) / len(polarities)) if polarities else None
             setup = _self._opportunity_setup(analysis, market, news_score)
             if setup["rebound_score"] < 30: continue
-            rows.append({"symbol": symbol, "name": item.get("name") or symbol, "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE})
+            rows.append({"symbol": symbol, "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
+                "name_en": item.get("name") or symbol, "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE})
         rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
         return {"success": True, "data": rows[:max(1, min(int(limit), 40))], "count": len(rows), "market": market, "sharia_universe_count": len(SHARIA_SYMBOLS)}
 
