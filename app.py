@@ -193,7 +193,7 @@ header[data-testid="stHeader"]{height:0!important;background:transparent!importa
 [data-testid="stSidebar"] [data-testid="stButton"]{display:none!important}
 [data-testid="stSidebar"] .stRadio{margin:0!important;padding:0!important}
 [data-testid="stSidebar"] .stRadio [role="radiogroup"]{
- display:grid!important;grid-template-columns:repeat(5,1fr)!important;
+ display:grid!important;grid-template-columns:repeat(7,1fr)!important;
  gap:3px!important;width:100%!important;height:70px!important;
 }
 [data-testid="stSidebar"] .stRadio [role="radio"]{
@@ -257,10 +257,69 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
  [data-testid="stSidebar"] .stRadio [role="radio"]{font-size:8px!important}
 }
 </style>
+<style>
+/* STRUCTURAL MOBILE APP SHELL */
+.m-shell{direction:rtl}
+.m-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:0 0 15px}
+.m-card{background:linear-gradient(145deg,#0f2135,#0b1726);border:1px solid #213c56;border-radius:17px;padding:14px 13px;min-height:94px;box-shadow:0 8px 22px rgba(0,0,0,.18)}
+.m-label{font-size:10px;color:#8095aa;font-weight:800}
+.m-value{font-size:20px;color:#f7fbff;font-weight:900;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-note{font-size:9px;color:#60778d;margin-top:4px;line-height:1.6}
+.action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:15px}
+.action-card{display:flex;align-items:center;gap:10px;background:#0d1b2c;border:1px solid #203750;border-radius:17px;padding:13px;min-height:67px}
+.action-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#102b21;color:#6feaa8;font-size:17px;font-weight:900;flex:0 0 36px}
+.action-title{font-size:12px;font-weight:900;color:#fff}
+.action-sub{font-size:9px;color:#70869b;margin-top:2px}
+.app-strip{display:flex;gap:7px;overflow:hidden;margin:0 0 14px}
+.strip-chip{background:#0d1b2c;border:1px solid #203750;border-radius:13px;padding:9px 11px;min-width:92px}
+.strip-symbol{font-size:11px;font-weight:900;color:#fff}
+.strip-value{font-size:10px;color:#7eeeb0;margin-top:2px}
+.premarket{background:linear-gradient(135deg,#0d2a20,#0b1d19);border:1px solid #276046;border-right:4px solid #22d47a;border-radius:19px;padding:15px;margin:0 0 15px}
+.premarket-title{font-size:13px;font-weight:900;color:#eafff3}
+.premarket-time{font-size:10px;color:#82b69c;margin-top:3px}
+.premarket-body{font-size:11px;color:#cde7d9;line-height:1.8;margin-top:8px}
+@media(max-width:700px){
+ .m-card-grid{gap:8px}
+ .m-card{padding:12px;min-height:88px}
+ .m-value{font-size:18px}
+ .action-card{min-height:63px;padding:11px}
+ .action-title{font-size:11px}
+ .action-sub{font-size:8px}
+ .action-icon{width:33px;height:33px;flex-basis:33px}
+ .app-strip{overflow-x:auto;scrollbar-width:none}
+ .app-strip::-webkit-scrollbar{display:none}
+ [data-testid="stSidebar"]{height:84px!important;max-height:84px!important}
+ [data-testid="stSidebar"]>div:first-child{height:84px!important}
+ [data-testid="stSidebar"] .stRadio [role="radiogroup"]{height:76px!important;align-items:center!important}
+ [data-testid="stSidebar"] .stRadio [role="radio"]{height:68px!important;min-height:68px!important;font-size:8px!important}
+}
+@media(max-width:390px){
+ .m-card{min-height:84px;padding:11px}
+ .m-value{font-size:17px}
+ .action-title{font-size:10px}
+}
+</style>
 """,
     unsafe_allow_html=True,
 )
 
+
+# -----------------------------
+# Mobile app shell helpers
+# -----------------------------
+def app_card(label, value, note=""):
+    return (
+        f'<div class="m-card"><div class="m-label">{label}</div>'
+        f'<div class="m-value">{value}</div>'
+        f'<div class="m-note">{note}</div></div>'
+    )
+
+def app_action(icon, title, subtitle):
+    return (
+        f'<div class="action-card"><div class="action-icon">{icon}</div>'
+        f'<div><div class="action-title">{title}</div>'
+        f'<div class="action-sub">{subtitle}</div></div></div>'
+    )
 
 # -----------------------------
 # App navigation
@@ -273,22 +332,16 @@ with st.sidebar:
     )
     page = st.radio(
         "NAV",
-        ["⌂  الرئيسية","◉  السوق","⌕  تحليل","☆  المتابعة","▣  المحفظة"],
+        ["⌂  الرئيسية","◉  السوق","⌕  تحليل","☆  المتابعة","▣  المحفظة","✦  الفرص","⚙  الإعدادات"],
         key="mobile_page",
         label_visibility="collapsed",
     )
-    if st.button("✦  الفرص", key="nav_opportunities", use_container_width=True):
-        st.session_state.jump_page = "✦  الفرص"
-        st.rerun()
-    if st.button("⚙  الإعدادات", key="nav_settings", use_container_width=True):
-        st.session_state.jump_page = "⚙  الإعدادات"
-        st.rerun()
     health = data_engine.health_check()
     state = "● متصل" if health["eodhd_configured"] else "● غير متصل"
     st.markdown(f'<div class="nav-status">{state}</div>', unsafe_allow_html=True)
 
 st.markdown(
-    '<div class="app-topbar"><div><div class="app-name">مدحت ستوكس</div>'
+    '<div class="app-topbar"><div><div class="app-name">مدحت ستوكس <span style="color:#22d47a">•</span></div>'
     '<div class="app-context">EGX • تحليل ذكي</div></div>'
     '<div class="market-pill">● السوق</div></div>',
     unsafe_allow_html=True,
@@ -298,82 +351,102 @@ st.markdown(
 # Dashboard
 # -----------------------------
 if page == "⌂  الرئيسية":
+    last = st.session_state.last_analysis
+
     st.markdown(
-        '<div class="hero"><div class="hero-title">مدحت ستوكس</div>'
-        '<div class="hero-sub">منصة EGX حديثة — بيانات فعلية، قراءة ذكية، وتجربة سريعة وواضحة بدون زحمة.</div>'
-        '<span class="badge">● النظام جاهز للتحليل</span></div>',
+        '<div class="hero"><div class="hero-title">صباح السوق 👋</div>'
+        '<div class="hero-sub">مدحت ستوكس — شاشة متابعة EGX قبل القرار، في مكان واحد وبشكل سريع.</div>'
+        '<span class="badge">● التحليل قبل افتتاح السوق</span></div>',
         unsafe_allow_html=True,
     )
 
-    last = st.session_state.last_analysis
     if last:
-        market_state = last["status"]
-        market_note = f"آخر سهم محلل: {last['symbol']}"
-        score = last["opportunity_score"]
-        risk = last["risk_score"]
+        st.markdown(
+            f'<div class="premarket"><div class="premarket-title">تحليل ما قبل الافتتاح</div>'
+            f'<div class="premarket-time">آخر جلسة: {last["date"]} • آخر سهم: {last["symbol"].replace(".EGX","")}</div>'
+            f'<div class="premarket-body">الحالة <b>{last["status"]}</b> • درجة الفرصة '
+            f'<b>{last["opportunity_score"]}</b> • المخاطر <b>{last["risk_score"]}</b>. '
+            f'هذه قراءة كمية وصفية وليست توصية شراء أو بيع.</div></div>',
+            unsafe_allow_html=True,
+        )
     else:
-        market_state, market_note, score, risk = "—", "ابدأ من البحث والتحليل", "—", "—"
+        st.markdown(
+            '<div class="premarket"><div class="premarket-title">تحليل ما قبل الافتتاح</div>'
+            '<div class="premarket-time">جاهز — لم يتم تشغيل تحليل لسهم بعد</div>'
+            '<div class="premarket-body">ابدأ بتحليل سهم من شاشة «تحليل» لتظهر هنا آخر قراءة فعلية.</div></div>',
+            unsafe_allow_html=True,
+        )
 
-    cards = [
-        ("حالة آخر تحليل", market_state, market_note),
-        ("الكون المستهدف", str(STOCK_UNIVERSE_SIZE), "هدف المنصة"),
-        ("المرجع الشرعي", str(len(SHARIA_SYMBOLS)), f"قائمة مرجعية حتى {REFERENCE_DATE}"),
-        ("آخر درجة فرصة", score, "حساب آلي وصفي، ليست توصية"),
-    ]
-    for col, (label, value, note) in zip(st.columns(4), cards):
-        with col:
-            st.markdown(
-                f'<div class="card"><div class="card-label">{label}</div>'
-                f'<div class="card-value">{value}</div><div class="card-note">{note}</div></div>',
-                unsafe_allow_html=True,
-            )
-
-    st.markdown('<div class="section">آخر قراءة تحليلية</div>', unsafe_allow_html=True)
     if last:
-        cols = st.columns(6)
-        metrics = [
-            ("السعر", money(last["close"])),
-            ("التغير", pct(last["change_pct"])),
-            ("RSI 14", money(last["rsi14"])),
-            ("SMA 20", money(last["sma20"])),
-            ("الدعم", money(last["support"])),
-            ("المقاومة", money(last["resistance"])),
+        cards = [
+            ("السعر", money(last["close"]), "آخر إغلاق"),
+            ("التغير", pct(last["change_pct"]), "الجلسة الأخيرة"),
+            ("RSI 14", money(last["rsi14"]), "الزخم"),
+            ("الفرصة", last["opportunity_score"], "درجة وصفية"),
         ]
-        for col, (label, value) in zip(cols, metrics):
-            with col:
-                st.markdown(
-                    f'<div class="metric"><div class="metric-name">{label}</div>'
-                    f'<div class="metric-value">{value}</div></div>',
-                    unsafe_allow_html=True,
-                )
-        st.info("قراءة كمية للبيانات المتاحة فقط — بدون أوامر شراء أو بيع.")
     else:
-        st.info("لم يتم تشغيل تحليل بعد. افتح «البحث والتحليل» واكتب رمز سهم مثل SWDY أو EGAL.")
+        cards = [
+            ("الأسهم المستهدفة", STOCK_UNIVERSE_SIZE, "هدف المنصة"),
+            ("المرجع الشرعي", len(SHARIA_SYMBOLS), f"حتى {REFERENCE_DATE}"),
+            ("قائمة المتابعة", len(st.session_state.watchlist), "جلسة حالية"),
+            ("المحفظة", len(st.session_state.portfolio), "مراكز حالية"),
+        ]
 
-    st.markdown('<div class="section">الوصول السريع</div>', unsafe_allow_html=True)
+    st.markdown('<div class="m-shell"><div class="m-card-grid">', unsafe_allow_html=True)
+    for label, value, note in cards:
+        st.markdown(app_card(label, value, note), unsafe_allow_html=True)
+    st.markdown('</div></div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="section">اختصارات</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="action-grid">'
+        + app_action("⌕", "تحليل سهم", "بيانات + مؤشرات + AI")
+        + app_action("✦", "الفرص", "الأسهم التي تتابعها")
+        + app_action("☆", "قائمة المتابعة", "مراقبة سريعة")
+        + app_action("▣", "المحفظة", "مراكزك وقيمتها")
+        + '</div>',
+        unsafe_allow_html=True,
+    )
     q1, q2 = st.columns(2)
     with q1:
-        if st.button("⌕  تحليل سهم", use_container_width=True):
+        if st.button("⌕ فتح التحليل", use_container_width=True, type="primary"):
             st.session_state.jump_page = "⌕  تحليل"
             st.rerun()
     with q2:
-        if st.button("✦  استكشف الفرص", use_container_width=True):
+        if st.button("✦ فتح الفرص", use_container_width=True):
             st.session_state.jump_page = "✦  الفرص"
             st.rerun()
 
-    st.markdown('<div class="section">كيف تعمل المنصة</div>', unsafe_allow_html=True)
-    a, b, c = st.columns(3)
-    for col, title, text in [
-        (a, "01 • البيانات", "بيانات الإغلاق والحجم والتاريخ من EODHD مع معالجة أخطاء واضحة."),
-        (b, "02 • التحليل", "اتجاهات SMA وRSI وATR والتذبذب والحجم والدعم والمقاومة."),
-        (c, "03 • الذكاء", "Gemini يشرح الإشارات المتاحة دون اختراع أرقام أو إصدار أمر شراء/بيع."),
-    ]:
-        with col:
-            st.markdown(
-                f'<div class="card"><div class="card-label">{title}</div>'
-                f'<div style="font-size:14px;color:#dce4eb;line-height:1.9;margin-top:8px">{text}</div></div>',
-                unsafe_allow_html=True,
-            )
+    st.markdown('<div class="section">آخر قراءة</div>', unsafe_allow_html=True)
+    if last:
+        st.markdown(
+            f'<div class="m-card-grid">'
+            f'{app_card("الدعم", money(last["support"]), "مستوى مقاس")}'
+            f'{app_card("المقاومة", money(last["resistance"]), "مستوى مقاس")}'
+            f'{app_card("SMA 20", money(last["sma20"]), "متوسط")}'
+            f'{app_card("SMA 50", money(last["sma50"]), "متوسط")}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info("لا توجد قراءة أخيرة بعد. استخدم زر «فتح التحليل» للبدء.")
+
+    st.markdown('<div class="section">ماذا يفعل التطبيق؟</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="m-card"><div class="m-label">01 • بيانات</div>'
+        '<div class="m-note" style="font-size:12px;color:#dbe6ef">يستقبل بيانات EGX المتاحة ويعرض آخر جلسة مكتملة.</div></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="m-card" style="margin-top:8px"><div class="m-label">02 • تحليل كمي</div>'
+        '<div class="m-note" style="font-size:12px;color:#dbe6ef">SMA وRSI وATR والحجم والدعم والمقاومة والعوائد التاريخية.</div></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="m-card" style="margin-top:8px"><div class="m-label">03 • شرح ذكي</div>'
+        '<div class="m-note" style="font-size:12px;color:#dbe6ef">Gemini يشرح الأرقام والإشارات المتاحة دون اختلاق بيانات أو إصدار أمر تداول.</div></div>',
+        unsafe_allow_html=True,
+    )
 
 
 # -----------------------------
@@ -579,31 +652,27 @@ elif page == "⌕  تحليل":
                     unsafe_allow_html=True,
                 )
 
-                cols = st.columns(4)
-                for col, label, value in [
-                    (cols[0], "آخر إغلاق", money(result["close"])),
-                    (cols[1], "التغير", pct(result["change_pct"])),
-                    (cols[2], "أعلى سعر", money(result["high"])),
-                    (cols[3], "أقل سعر", money(result["low"])),
-                ]:
-                    with col:
-                        st.markdown(
-                            f'<div class="metric"><div class="metric-name">{label}</div>'
-                            f'<div class="metric-value">{value}</div></div>',
-                            unsafe_allow_html=True,
-                        )
+                st.markdown(
+                    '<div class="m-card-grid">'
+                    f'{app_card("آخر إغلاق", money(result["close"]), "السعر")}'
+                    f'{app_card("التغير", pct(result["change_pct"]), "الجلسة الأخيرة")}'
+                    f'{app_card("أعلى سعر", money(result["high"]), "الجلسة")}'
+                    f'{app_card("أقل سعر", money(result["low"]), "الجلسة")}'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
 
                 st.markdown('<div class="section">ملخص التحليل</div>', unsafe_allow_html=True)
-                cols = st.columns(5)
-                for col, label, value in [
-                    (cols[0], "الحالة", result["status"]),
-                    (cols[1], "درجة الفرصة", result["opportunity_score"]),
-                    (cols[2], "درجة المخاطر", result["risk_score"]),
-                    (cols[3], "الدعم", money(result["support"])),
-                    (cols[4], "المقاومة", money(result["resistance"])),
-                ]:
-                    with col:
-                        st.metric(label, value)
+                st.markdown(
+                    '<div class="m-card-grid">'
+                    f'{app_card("الحالة", result["status"], "الوضع الفني")}'
+                    f'{app_card("درجة الفرصة", result["opportunity_score"], "وصفية")}'
+                    f'{app_card("درجة المخاطر", result["risk_score"], "وصفية")}'
+                    f'{app_card("الدعم", money(result["support"]), "مستوى")}'
+                    f'{app_card("المقاومة", money(result["resistance"]), "مستوى")}'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
 
                 if sharia_ok:
                     st.success("السهم موجود في قائمة الشرعية المرجعية المدمجة. راجع تاريخ المرجع قبل اتخاذ أي قرار.")
@@ -656,20 +725,16 @@ elif page == "⌕  تحليل":
                 if st.session_state.last_fundamentals:
                     f = st.session_state.last_fundamentals
                     st.markdown('<div class="section">لقطة أساسية</div>', unsafe_allow_html=True)
-                    cols = st.columns(5)
-                    for col, label, value in [
-                        (cols[0], "الشركة", f.get("name", "—")),
-                        (cols[1], "القطاع", f.get("sector", "—")),
-                        (cols[2], "القيمة السوقية", integer(f.get("market_cap"))),
-                        (cols[3], "P/E", money(f.get("pe"))),
-                        (cols[4], "عائد التوزيعات", pct(f.get("dividend_yield"))),
-                    ]:
-                        with col:
-                            st.markdown(
-                                f'<div class="metric"><div class="metric-name">{label}</div>'
-                                f'<div class="metric-value" style="font-size:17px">{value}</div></div>',
-                                unsafe_allow_html=True,
-                            )
+                    st.markdown(
+                        '<div class="m-card-grid">'
+                        f'{app_card("الشركة", f.get("name", "—"), "الاسم")}'
+                        f'{app_card("القطاع", f.get("sector", "—"), "التصنيف")}'
+                        f'{app_card("القيمة السوقية", integer(f.get("market_cap")), "Market Cap")}'
+                        f'{app_card("P/E", money(f.get("pe")), "مضاعف")}'
+                        f'{app_card("عائد التوزيعات", pct(f.get("dividend_yield")), "Dividend Yield")}'
+                        '</div>',
+                        unsafe_allow_html=True,
+                    )
 
                 if st.session_state.last_ai and st.session_state.last_ai.get("success"):
                     st.markdown('<div class="section">التحليل الذكي</div>', unsafe_allow_html=True)
