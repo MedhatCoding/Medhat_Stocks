@@ -662,7 +662,7 @@ elif page == "◉  السوق":
             st.markdown('<div class="section">آخر سهم تم تحليله</div>', unsafe_allow_html=True)
             st.markdown(
                 '<div class="m-card-grid">'
-                f'{app_card("السهم", last.get("symbol","—"), last.get("date","—"))}'
+                f'{app_card("الشركة", data_engine.arabic_company_name(last.get("symbol","—"), last.get("symbol","—")), "رمز التداول: " + last.get("symbol","—"))}'
                 f'{app_card("RSI", money(last.get("rsi14")), "14 جلسة")}'
                 f'{app_card("الفرصة", last.get("final_opportunity_score",last.get("opportunity_score","—")), "من 100")}'
                 f'{app_card("المخاطر", last.get("risk_score","—"), "من 100")}'
@@ -704,7 +704,7 @@ elif page == "✦  الفرص":
             sharia = row.get("sharia_compliant") is True
             st.markdown(
                 f'<div class="m-card-grid">'
-                f'{app_card("الشركة", row.get("name","اسم الشركة غير متاح"), "رمز التداول: " + symbol)}'
+                f'{app_card("الشركة", data_engine.arabic_company_name(symbol, row.get("name","اسم الشركة غير متاح")), "رمز التداول: " + symbol)}'
                 f'{price_card("السعر الحالي", row.get("close"), row.get("change_pct"), "آخر سعر متاح")}'
                 f'{app_card("نسبة التغير", pct(row.get("change_pct")), "الجلسة الأخيرة", value_class(row.get("change_pct")))}'
                 f'{app_card("الفرصة", row.get("opportunity_score","—"), "من 100")}'
@@ -723,9 +723,17 @@ elif page == "✦  الفرص":
                 f"RSI {money(row.get('rsi14'))} • تغير 20 جلسة {pct(row.get('return20'))} • "
                 f"نسبة الحجم {money(row.get('volume_ratio'))} • الأخبار {money(row.get('news_score'))}"
             )
-            if st.button("⭐ إضافة للمتابعة", key=f"opp_watch_{symbol}_{i}", use_container_width=True):
-                add_watchlist(symbol)
-                st.success(f"تمت إضافة {symbol} لقائمة المتابعة.")
+            a1, a2 = st.columns(2)
+            with a1:
+                if st.button("🔎 تحليل السهم", key=f"opp_analyze_{symbol}_{i}", use_container_width=True, type="primary"):
+                    st.session_state.prefill_symbol = symbol
+                    st.session_state.analysis_autorun = True
+                    st.session_state.mobile_page = "⌕  تحليل"
+                    st.rerun()
+            with a2:
+                if st.button("⭐ إضافة للمتابعة", key=f"opp_watch_{symbol}_{i}", use_container_width=True):
+                    add_watchlist(symbol)
+                    st.success(f"تمت إضافة {data_engine.arabic_company_name(symbol, symbol)} لقائمة المتابعة.")
             st.markdown("---")
 
         st.markdown('<div class="section">لماذا ظهر هذا السهم؟</div>', unsafe_allow_html=True)
@@ -860,7 +868,7 @@ elif page == "⌕  تحليل":
     )
 
     st.markdown('<div class="search-panel">', unsafe_allow_html=True)
-    query = st.text_input("ابحث عن السهم", value=st.session_state.pop("prefill_symbol", ""), placeholder="مثال: SWDY أو EGAL", label_visibility="visible")
+    query = st.text_input("ابحث عن السهم", value=st.session_state.get("prefill_symbol", ""), placeholder="مثال: SWDY أو EGAL", label_visibility="visible")
     suggestions = data_engine.search_symbols(query) if query else []
     if suggestions:
         st.caption("اقتراحات من قائمة EGX:")
@@ -879,7 +887,11 @@ elif page == "⌕  تحليل":
         technical_visible = st.checkbox("إظهار التفاصيل الفنية", value=False)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    if analyze:
+    if analyze or st.session_state.get("analysis_autorun"):
+        st.session_state.analysis_autorun = False
+        st.session_state.prefill_symbol = selected_symbol or st.session_state.get("prefill_symbol", "")
+        if not selected_symbol:
+            selected_symbol = st.session_state.prefill_symbol
         if not selected_symbol:
             st.warning("اكتب رمز السهم أولاً.")
         else:
@@ -890,6 +902,7 @@ elif page == "⌕  تحليل":
             else:
                 st.session_state.last_analysis = result
                 st.session_state.last_ai = None
+                st.session_state.prefill_symbol = result["symbol"].replace(".EGX", "")
                 symbol = result["symbol"].replace(".EGX", "")
                 sharia_ok = sharia_status(symbol)
 
