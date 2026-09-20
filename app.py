@@ -125,65 +125,65 @@ st.markdown(
 }
 
 html, body, [class*="css"] { font-family:'Cairo',sans-serif; }
-.stApp { background:radial-gradient(circle at 80% -10%, #182433 0, var(--bg) 38%); color:var(--text); }
-.main .block-container { direction:rtl; text-align:right; max-width:1540px; padding:26px 30px 56px; }
+.stApp { background:linear-gradient(180deg,#070b10 0%,#0a1017 48%,#080d13 100%); color:var(--text); }
+.main .block-container { direction:rtl; text-align:right; max-width:1540px; padding:18px 24px 44px; }
 [data-testid="stSidebar"] {
-  background:#0b1118;
-  border-left:1px solid var(--border);
+  background:linear-gradient(180deg,#0d151e,#090f16);
+  border-left:1px solid #263545;
   border-right:0;
 }
 [data-testid="stSidebar"] * { font-family:'Cairo',sans-serif; }
 [data-testid="stSidebar"] .stRadio label { color:#bdc8d3; font-weight:700; }
-[data-testid="stSidebar"] .stRadio label:hover { color:var(--gold2); }
+[data-testid="stSidebar"] .stRadio label:hover { color:#ffd875; }
 
 .brand { padding:8px 2px 14px; }
-.brand-title { font-size:23px; font-weight:800; color:#fff; }
+.brand-title { font-size:21px; font-weight:800; color:#fff; }
 .brand-sub { color:var(--muted); font-size:12px; margin-top:3px; }
 
 .hero {
   background:linear-gradient(145deg,rgba(20,31,44,.98),rgba(10,16,23,.98));
-  border:1px solid var(--border); border-radius:20px; padding:24px 28px;
-  margin-bottom:22px; box-shadow:0 14px 40px rgba(0,0,0,.16);
+  border:1px solid #263545; border-radius:13px; padding:20px 24px;
+  margin-bottom:18px; box-shadow:0 10px 28px rgba(0,0,0,.22);
 }
-.hero-title { font-size:28px; font-weight:800; letter-spacing:-.4px; color:#fff; }
+.hero-title { font-size:25px; font-weight:800; letter-spacing:-.4px; color:#fff; }
 .hero-sub { color:var(--muted); font-size:13px; margin-top:4px; }
 .badge { display:inline-block; margin-top:16px; padding:6px 12px; border-radius:999px;
   background:rgba(53,201,138,.10); border:1px solid rgba(53,201,138,.24);
-  color:#6de0aa; font-size:12px; font-weight:700; }
+  color:#70e5ae; font-size:12px; font-weight:700; }
 .badge.gold { background:rgba(214,179,90,.10); border-color:rgba(214,179,90,.25); color:var(--gold2); }
-.badge.red { background:rgba(239,107,115,.10); border-color:rgba(239,107,115,.25); color:#ff9aa0; }
+.badge.red { background:rgba(239,107,115,.10); border-color:rgba(239,107,115,.25); color:#ff9ca3; }
 
 .card {
   background:linear-gradient(145deg,#111b27,#0d151e);
-  border:1px solid var(--border); border-radius:18px; padding:18px; min-height:112px;
+  border:1px solid #263545; border-radius:14px; padding:15px 16px; min-height:96px;
 }
 .card-label { color:var(--muted); font-size:12px; }
 .card-value { color:#fff; font-size:23px; font-weight:800; margin-top:6px; }
 .card-note { color:#68798a; font-size:11px; margin-top:5px; }
 
-.section { font-size:18px; font-weight:800; color:#f7f9fb; margin:24px 0 11px; }
+.section { font-size:17px; font-weight:800; color:#f7f9fb; margin:20px 0 9px; }
 .metric {
-  background:#0e1721; border:1px solid var(--border); border-radius:16px;
-  padding:14px; text-align:right;
+  background:#0e1721; border:1px solid var(--border); border-radius:13px;
+  padding:11px 13px; text-align:right;
 }
 .metric-name { color:var(--muted); font-size:11px; }
-.metric-value { color:#fff; font-size:19px; font-weight:800; margin-top:3px; }
+.metric-value { color:#fff; font-size:18px; font-weight:800; margin-top:3px; }
 
 .search-panel {
-  background:#0e1721; border:1px solid var(--border); border-radius:20px;
-  padding:16px 18px; margin-bottom:16px;
+  background:#0e1721; border:1px solid var(--border); border-radius:15px;
+  padding:13px 15px; margin-bottom:16px;
 }
 div[data-testid="stTextInput"] input, div[data-baseweb="select"] > div {
   background:#0a1118 !important; border-color:#2b3a4a !important;
   color:#fff !important; border-radius:12px !important;
 }
 div[data-testid="stButton"] > button {
-  min-height:40px; border-radius:10px; font-family:'Cairo',sans-serif; font-weight:800;
-  border:1px solid #334252; background:#121d29; color:#eef3f7;
+  min-height:38px; border-radius:9px; font-family:'Cairo',sans-serif; font-weight:800;
+  border:1px solid #334252; background:linear-gradient(180deg,#172331,#101923); color:#f4f7fa;
 }
-div[data-testid="stButton"] > button:hover { border-color:var(--gold); color:var(--gold2); }
+div[data-testid="stButton"] > button:hover { border-color:var(--gold); color:#fff; background:linear-gradient(180deg,#2a3542,#18222d); }
 div[data-testid="stDownloadButton"] > button {
-  min-height:43px; border-radius:12px; font-family:'Cairo',sans-serif; font-weight:800;
+  min-height:40px; border-radius:10px; font-family:'Cairo',sans-serif; font-weight:800;
 }
 div[data-testid="stMetric"] { background:#0e1721; border:1px solid var(--border); padding:12px; border-radius:14px; }
 .stAlert { border-radius:14px; }
@@ -193,7 +193,7 @@ footer { visibility:hidden; }
 .small-note { color:#748495; font-size:11px; line-height:1.8; }
 .ai-box {
   background:linear-gradient(145deg,rgba(31,42,57,.75),rgba(14,21,29,.95));
-  border:1px solid rgba(214,179,90,.25); border-radius:18px; padding:22px;
+  border:1px solid rgba(214,179,90,.25); border-radius:18px; padding:18px;
   line-height:2; white-space:pre-wrap;
 }
 </style>
@@ -241,8 +241,8 @@ with st.sidebar:
 # -----------------------------
 if page == "لوحة التحكم":
     st.markdown(
-        '<div class="hero"><div class="hero-title">مركز التحليل الذكي</div>'
-        '<div class="hero-sub">منصة مدحت ستوكس AI لمتابعة الأسهم المصرية مع فصل البيانات عن التحليل والفلترة الشرعية.</div>'
+        '<div class="hero"><div class="hero-title">مدحت ستوكس AI</div>'
+        '<div class="hero-sub">لوحة احترافية لتحليل EGX — بيانات فعلية، مؤشرات كمية، وشرح ذكي بدون ضوضاء.</div>'
         '<span class="badge">● النظام جاهز للتحليل</span></div>',
         unsafe_allow_html=True,
     )
@@ -288,11 +288,11 @@ if page == "لوحة التحكم":
                     f'<div class="metric-value">{value}</div></div>',
                     unsafe_allow_html=True,
                 )
-        st.info("هذه قراءة كمية للبيانات المتاحة، وليست توصية شراء أو بيع.")
+        st.info("قراءة كمية للبيانات المتاحة فقط — بدون أوامر شراء أو بيع.")
     else:
         st.info("لم يتم تشغيل تحليل بعد. افتح «البحث والتحليل» واكتب رمز سهم مثل SWDY أو EGAL.")
 
-    st.markdown('<div class="section">منهجية المنصة</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section">كيف تعمل المنصة</div>', unsafe_allow_html=True)
     a, b, c = st.columns(3)
     for col, title, text in [
         (a, "01 • البيانات", "بيانات الإغلاق والحجم والتاريخ من EODHD مع معالجة أخطاء واضحة."),
