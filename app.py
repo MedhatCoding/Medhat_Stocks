@@ -722,7 +722,7 @@ elif page == "✦  الفرص":
             with c3:
                 st.metric("إلغاء السيناريو", money(row.get("invalidation")))
             st.caption(
-                f"RSI {money(row.get('rsi14'))} • تغير 20 جلسة {pct(row.get('return20'))} • "
+                f"رمز التداول: {symbol} • RSI {money(row.get('rsi14'))} • تغير 20 جلسة {pct(row.get('return20'))} • "
                 f"نسبة الحجم {money(row.get('volume_ratio'))} • الأخبار {money(row.get('news_score'))}"
             )
             a1, a2 = st.columns(2)
@@ -752,7 +752,7 @@ elif page == "✦  الفرص":
                 lambda s: data_engine.arabic_company_name(s, str(s))
             )
         cols = [c for c in [
-            "اسم الشركة", "symbol", "opportunity_score", "rebound_score", "risk_score",
+            "اسم الشركة", "opportunity_score", "rebound_score", "risk_score",
             "rsi14", "return20", "volume_ratio", "news_score", "setup"
         ] if c in table.columns]
         st.dataframe(table[cols], use_container_width=True, hide_index=True)
