@@ -152,7 +152,7 @@ class StockDetails extends StatefulWidget {final String symbol,name;const StockD
 class _StockDetailsState extends State<StockDetails>{
  Map<String,dynamic>? a; Map<String,dynamic>? p; String? error;
  @override void initState(){super.initState();load();}
- Future<void> load() async {try{final vals=await Future.wait([Api.get('/stocks/${widget.symbol}/latest'),Api.get('/stocks/${widget.symbol}/analysis')]);if(mounted)setState(()=>{p=vals[0],a=vals[1]});}catch(e){if(mounted)setState(()=>error=e.toString());}}
+ Future<void> load() async {try{final vals=await Future.wait([Api.get('/stocks/${widget.symbol}/latest'),Api.get('/stocks/${widget.symbol}/analysis')]);if(mounted)setState(() { p = vals[0]; a = vals[1]; });}catch(e){if(mounted)setState(()=>error=e.toString());}}
  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.symbol),backgroundColor:Colors.transparent),body:ListView(padding:const EdgeInsets.all(20),children:[
    Text(widget.name,style:const TextStyle(color:Colors.white54)),const SizedBox(height:18),
    Text(p?['close']?.toString()??'—',style:const TextStyle(fontSize:40,fontWeight:FontWeight.w900)),Text(p?['change_pct']==null?'—':'${double.parse(p!['change_pct'].toString()).toStringAsFixed(2)}%',style:TextStyle(color:(p?['change_pct']??0)>=0?Colors.greenAccent:Colors.redAccent,fontSize:18,fontWeight:FontWeight.bold)),
