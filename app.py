@@ -19,7 +19,7 @@ except Exception:
 
 
 st.set_page_config(
-    page_title=APP_NAME,
+    page_title=f"{APP_NAME} • BUILD 2026.09.20",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -117,15 +117,16 @@ st.markdown(
   --border:#233142;
   --text:#eef3f7;
   --muted:#8b9aaa;
-  --gold:#e7b94f;
-  --gold2:#ffd875;
+  --gold:#d6b35a;
+  --gold2:#f4d27a;
+  --accent:#4f8cff;
   --green:#35c98a;
   --red:#ef6b73;
   --blue:#62a7ff;
 }
 
 html, body, [class*="css"] { font-family:'Cairo',sans-serif; }
-.stApp { background:linear-gradient(180deg,#070b10 0%,#0a1017 48%,#080d13 100%); color:var(--text); }
+.stApp { background:radial-gradient(circle at 12% 0%,rgba(79,140,255,.09),transparent 28%),linear-gradient(180deg,#060a0f 0%,#0a1119 48%,#070c12 100%); color:var(--text); }
 .main .block-container { direction:rtl; text-align:right; max-width:1540px; padding:18px 24px 44px; }
 [data-testid="stSidebar"] {
   background:linear-gradient(180deg,#0d151e,#090f16);
@@ -142,10 +143,10 @@ html, body, [class*="css"] { font-family:'Cairo',sans-serif; }
 
 .hero {
   background:linear-gradient(145deg,rgba(20,31,44,.98),rgba(10,16,23,.98));
-  border:1px solid #263545; border-radius:13px; padding:20px 24px;
+  border:1px solid #2d3d50; border-radius:16px; padding:22px 26px;
   margin-bottom:18px; box-shadow:0 10px 28px rgba(0,0,0,.22);
 }
-.hero-title { font-size:25px; font-weight:800; letter-spacing:-.4px; color:#fff; }
+.hero-title { font-size:27px; font-weight:800; letter-spacing:-.4px; color:#fff; }
 .hero-sub { color:var(--muted); font-size:13px; margin-top:4px; }
 .badge { display:inline-block; margin-top:16px; padding:6px 12px; border-radius:999px;
   background:rgba(53,201,138,.10); border:1px solid rgba(53,201,138,.24);
@@ -155,22 +156,22 @@ html, body, [class*="css"] { font-family:'Cairo',sans-serif; }
 
 .card {
   background:linear-gradient(145deg,#111b27,#0d151e);
-  border:1px solid #263545; border-radius:14px; padding:15px 16px; min-height:96px;
+  border:1px solid #2a3a4c; border-radius:16px; padding:17px 18px; min-height:102px;
 }
 .card-label { color:var(--muted); font-size:12px; }
-.card-value { color:#fff; font-size:23px; font-weight:800; margin-top:6px; }
+.card-value { color:#fff; font-size:22px; font-weight:800; margin-top:6px; }
 .card-note { color:#68798a; font-size:11px; margin-top:5px; }
 
 .section { font-size:17px; font-weight:800; color:#f7f9fb; margin:20px 0 9px; }
 .metric {
-  background:#0e1721; border:1px solid var(--border); border-radius:13px;
+  background:linear-gradient(145deg,#101b28,#0c151f); border:1px solid #27384a; border-radius:14px;
   padding:11px 13px; text-align:right;
 }
 .metric-name { color:var(--muted); font-size:11px; }
 .metric-value { color:#fff; font-size:18px; font-weight:800; margin-top:3px; }
 
 .search-panel {
-  background:#0e1721; border:1px solid var(--border); border-radius:15px;
+  background:linear-gradient(145deg,#101a26,#0c141d); border:1px solid #27384a; border-radius:16px;
   padding:13px 15px; margin-bottom:16px;
 }
 div[data-testid="stTextInput"] input, div[data-baseweb="select"] > div {
@@ -179,9 +180,9 @@ div[data-testid="stTextInput"] input, div[data-baseweb="select"] > div {
 }
 div[data-testid="stButton"] > button {
   min-height:38px; border-radius:9px; font-family:'Cairo',sans-serif; font-weight:800;
-  border:1px solid #334252; background:linear-gradient(180deg,#172331,#101923); color:#f4f7fa;
+  border:1px solid #334252; background:linear-gradient(180deg,#1a2b3e,#111d2a); color:#f7f9fb;
 }
-div[data-testid="stButton"] > button:hover { border-color:var(--gold); color:#fff; background:linear-gradient(180deg,#2a3542,#18222d); }
+div[data-testid="stButton"] > button:hover { border-color:var(--accent); color:#fff; background:linear-gradient(180deg,#21364d,#172637); }
 div[data-testid="stDownloadButton"] > button {
   min-height:40px; border-radius:10px; font-family:'Cairo',sans-serif; font-weight:800;
 }
@@ -241,7 +242,7 @@ with st.sidebar:
 # -----------------------------
 if page == "لوحة التحكم":
     st.markdown(
-        '<div class="hero"><div class="hero-title">مدحت ستوكس AI</div>'
+        '<div class="hero"><div class="hero-title">مدحت ستوكس AI <span style="font-size:11px;color:#8fb8ff;font-weight:700;vertical-align:middle">BUILD 2026.09.20</span></div>'
         '<div class="hero-sub">لوحة احترافية لتحليل EGX — بيانات فعلية، مؤشرات كمية، وشرح ذكي بدون ضوضاء.</div>'
         '<span class="badge">● النظام جاهز للتحليل</span></div>',
         unsafe_allow_html=True,
