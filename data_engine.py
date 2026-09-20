@@ -700,6 +700,12 @@ class DataEngine:
         if not opportunities.get("success"):
             return {"success": False, "error": opportunities.get("error", "تعذر فحص الفرص")}
         latest_session_date = market.get("date")
+        if not latest_session_date:
+            latest_session_date = next(
+                (row.get("date") for row in opportunities.get("data", []) if row.get("date")),
+                None,
+            )
+        latest_session_date = latest_session_date or "غير متاح من مزود البيانات"
         return {
             "success": True,
             "date": now.strftime("%Y-%m-%d"),
