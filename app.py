@@ -1,4 +1,6 @@
 import os
+import json
+from pathlib import Path
 from datetime import datetime
 
 import pandas as pd
@@ -26,12 +28,45 @@ st.set_page_config(
 )
 
 # -----------------------------
+# Personal persistence
+# -----------------------------
+# Personal-use only: no accounts or database.
+PERSONAL_DATA_FILE = Path(__file__).with_name("personal_data.json")
+
+def load_personal_data():
+    try:
+        if PERSONAL_DATA_FILE.exists():
+            data = json.loads(PERSONAL_DATA_FILE.read_text(encoding="utf-8"))
+            return {
+                "watchlist": list(data.get("watchlist", [])),
+                "portfolio": list(data.get("portfolio", [])),
+            }
+    except (OSError, ValueError, TypeError):
+        pass
+    return {"watchlist": [], "portfolio": []}
+
+def save_personal_data():
+    data = {
+        "watchlist": st.session_state.get("watchlist", []),
+        "portfolio": st.session_state.get("portfolio", []),
+    }
+    try:
+        PERSONAL_DATA_FILE.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+_initial_personal_data = load_personal_data()
+
+# -----------------------------
 # Session state
 # -----------------------------
 if "watchlist" not in st.session_state:
-    st.session_state.watchlist = []
+    st.session_state.watchlist = _initial_personal_data["watchlist"]
 if "portfolio" not in st.session_state:
-    st.session_state.portfolio = []
+    st.session_state.portfolio = _initial_personal_data["portfolio"]
 if "last_analysis" not in st.session_state:
     st.session_state.last_analysis = None
 if "last_ai" not in st.session_state:
@@ -85,11 +120,13 @@ def add_watchlist(symbol):
     symbol = data_engine.display_symbol(symbol)
     if symbol and symbol not in st.session_state.watchlist:
         st.session_state.watchlist.append(symbol)
+        save_personal_data()
 
 
 def remove_watchlist(symbol):
     if symbol in st.session_state.watchlist:
         st.session_state.watchlist.remove(symbol)
+        save_personal_data()
 
 
 def send_telegram(message):
@@ -527,8 +564,8 @@ if page == "⌂  الرئيسية":
     cards = [
         ("الأسهم المستهدفة", STOCK_UNIVERSE_SIZE, "هدف المنصة"),
         ("المرجع الشرعي", len(SHARIA_SYMBOLS), f"حتى {REFERENCE_DATE}"),
-        ("قائمة المتابعة", len(st.session_state.watchlist), "محفوظة في الجلسة الحالية"),
-        ("المحفظة", len(st.session_state.portfolio), "مراكز حالية"),
+        ("قائمة المتابعة", len(st.session_state.watchlist), "محفوظة تلقائيًا"),
+        ("المحفظة", len(st.session_state.portfolio), "مراكز محفوظة"),
     ]
     if last:
         cards = [
@@ -758,6 +795,7 @@ elif page == "▣  المحفظة":
             })
             if st.button(f"✕ إزالة {pos['symbol']}", key=f"portfolio_remove_{pos['symbol']}_{i}", use_container_width=True):
                 st.session_state.portfolio.pop(i)
+                save_personal_data()
                 st.rerun()
         pnl_total = total_value - total_cost if total_value else None
         st.markdown('<div class="m-card-grid">'
@@ -997,8 +1035,8 @@ elif page == "⚙  الإعدادات":
 
     st.markdown('<div class="section">ملاحظات تشغيلية</div>', unsafe_allow_html=True)
     st.info(
-        "المحفظة وقائمة المتابعة في هذه النسخة محفوظتان داخل جلسة Streamlit الحالية. "
-        "للحفظ الدائم بين الأجهزة نحتاج قاعدة بيانات وحسابات مستخدمين في مرحلة لاحقة."
+        "المحفظة وقائمة المتابعة للاستخدام الشخصي وتُحفظ في ملف personal_data.json داخل بيئة التطبيق. "
+        "لا توجد حسابات مستخدمين أو قاعدة بيانات تجارية."
     )
 
     st.json({
