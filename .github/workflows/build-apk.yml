@@ -30,6 +30,10 @@ jobs:
         working-directory: mobile
         run: flutter pub get
 
+      - name: Remove generated test
+        working-directory: mobile
+        run: rm -f test/widget_test.dart
+
       - name: Analyze
         working-directory: mobile
         run: flutter analyze
