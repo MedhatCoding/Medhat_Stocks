@@ -33,6 +33,105 @@ class DataEngine:
         self.gemini_api_key = get_secret("GEMINI_API_KEY")
         self.gemini_model = get_secret("GEMINI_MODEL") or "gemini-2.5-flash"
 
+    ARABIC_COMPANY_NAMES = {
+        "AALR":"العربية للأدوية والصناعات الكيماوية",
+        "ACGC":"العربية لحليج الأقطان",
+        "ACRO":"كريستال أسيل للدهانات والكيماويات",
+        "ADIB":"مصرف أبو ظبي الإسلامي - مصر",
+        "AIFI":"العربية للاستثمارات المالية",
+        "AITG":"أجواء للصناعات الغذائية",
+        "AIVCB":"العربية للاستثمارات والتنمية",
+        "ALUM":"الألومنيوم العربية",
+        "AMER":"عامر جروب",
+        "AMES":"أسمنت سيناء",
+        "AMOC":"الإسكندرية للزيوت المعدنية",
+        "APPC":"العربية لمنتجات الألبان",
+        "ARCC":"العربية للأسمنت",
+        "ARVA":"العربية لمنتجات الأدوية",
+        "ATLC":"التوفيق للتأجير التمويلي",
+        "ATQA":"الإسكندرية لتداول الحاويات والبضائع",
+        "AXPH":"الإسكندرية للأدوية والصناعات الكيماوية",
+        "BIOC":"جلاكسو سميثكلاين مصر",
+        "BTFH":"بلتون القابضة",
+        "CAED":"القاهرة للأدوية والصناعات الكيماوية",
+        "CLHO":"مستشفى كليوباترا",
+        "COSG":"القاهرة للزيوت والصابون",
+        "CPCI":"القاهرة للاستثمار والتنمية العقارية",
+        "DAPH":"الداو للتنمية العقارية",
+        "DCRC":"دايس للملابس الجاهزة",
+        "EFIC":"المالية والصناعية المصرية",
+        "EFID":"إي فاينانس للاستثمارات المالية والرقمية",
+        "EGAL":"مصر للألومنيوم",
+        "EGAS":"المصرية للغازات الطبيعية",
+        "ELKA":"القاهرة للاستثمار والتنمية",
+        "ELNA":"النصر للأعمال المدنية",
+        "EMRI":"إميرالد للاستثمار العقاري",
+        "ETRS":"المصرية لخدمات النقل",
+        "FAIT":"بنك فيصل الإسلامي المصري - بالجنيه",
+        "FAITA":"بنك فيصل الإسلامي المصري - بالدولار",
+        "GGCC":"جي بي كورب",
+        "GIHD":"غاز مصر",
+        "GMCI":"جولدن تكس للأصواف",
+        "GSSC":"القلعة للاستثمارات المالية",
+        "GTHE":"الجيزة العامة للمقاولات",
+        "IDHC":"ابن سينا فارما",
+        "IFAP":"الإسماعيلية الوطنية للصناعات الغذائية",
+        "INFI":"إنفينيتي كابيتال",
+        "IRON":"عز الدخيلة للصلب - الإسكندرية",
+        "ISMA":"الإسماعيلية مصر للدواجن",
+        "ISMQ":"الحديد والصلب للمناجم والمحاجر",
+        "JUFO":"جهينة للصناعات الغذائية",
+        "KABO":"النيل للكبريت والمطاط",
+        "MAAL":"المصرية للمنتجعات السياحية",
+        "MBEG":"مدينة مصر للإسكان والتعمير",
+        "MASR":"مدينة مصر للإسكان والتعمير",
+        "MBSC":"مصر بني سويف للأسمنت",
+        "MCQE":"مصر للأسمنت - قنا",
+        "MCRO":"مصر لصناعة الكيماويات",
+        "MEPA":"مينا فارم للأدوية والصناعات الكيماوية",
+        "MFPC":"أبو قير للأسمدة والصناعات الكيماوية",
+        "MICH":"مصر لصناعة الكيماويات",
+        "MILS":"مطاحن مصر الوسطى",
+        "MOED":"مصر لإنتاج الأسمدة - موبكو",
+        "MPCO":"المنصورة للدواجن",
+        "MTIE":"إم تي آي",
+        "NCEM":"شمال الصعيد للتنمية والإنتاج الزراعي",
+        "NCGC":"النيل لحليج الأقطان",
+        "NDRL":"الوادي العالمية للاستثمار والتنمية",
+        "NEDA":"النصر للأعمال المدنية",
+        "NIPH":"النيل للأدوية والصناعات الكيماوية",
+        "NOAF":"شمال أفريقيا للاستثمار العقاري",
+        "ORAS":"أوراسكوم كونستراكشون",
+        "PACH":"باكين",
+        "PHDC":"بالم هيلز للتعمير",
+        "PRDC":"بروبرتيز للتنمية العقارية",
+        "RACC":"راية القابضة للاستثمارات المالية",
+        "RMDA":"العاشر من رمضان للصناعات الدوائية",
+        "RREI":"الحديد والصلب المصرية - سابقًا",
+        "RUBX":"روبكس العالمية لتصنيع البلاستيك والأكريليك",
+        "SAUD":"المصرية للمنتجعات السياحية",
+        "SCEM":"أسمنت سيناء",
+        "SIPC":"سبينالكس",
+        "SMCS":"سماد مصر",
+        "SMFR":"سماد مصر - إيجيفرت",
+        "SPIN":"الإسكندرية الوطنية للاستثمارات المالية",
+        "SPMD":"سبينالكس",
+        "SUCE":"السويس للأسمنت",
+        "SUGR":"الدلتا للسكر",
+        "SVCE":"جنوب الوادي للأسمنت",
+        "SWDY":"السويدي إليكتريك",
+        "TALM":"تعليم لخدمات الإدارة",
+        "TRSI":"العربية للخزف - سيراميكا ريماس",
+        "VODE":"فودافون مصر",
+        "WATP":"وادى كوم أمبو لاستصلاح الأراضي",
+        "ZEOT":"الزيوت المستخلصة ومنتجاتها",
+    }
+
+    @classmethod
+    def arabic_company_name(cls, symbol, fallback="اسم الشركة غير متاح"):
+        code = cls.display_symbol(symbol)
+        return cls.ARABIC_COMPANY_NAMES.get(code, fallback)
+
     @staticmethod
     def normalize_symbol(symbol):
         value = (symbol or "").strip().upper()
@@ -365,7 +464,8 @@ class DataEngine:
         return {
             "success": True,
             "symbol": result["symbol"],
-            "name": general.get("Name") or general.get("NameLong") or self.display_symbol(result["symbol"]),
+            "name": self.arabic_company_name(result["symbol"], general.get("Name") or general.get("NameLong") or self.display_symbol(result["symbol"])),
+            "name_en": general.get("Name") or general.get("NameLong") or self.display_symbol(result["symbol"]),
             "description": general.get("Description") or "",
             "sector": general.get("Sector") or "—",
             "industry": general.get("Industry") or "—",
@@ -500,7 +600,18 @@ class DataEngine:
         index_symbol = os.getenv("EGX_INDEX_SYMBOL", "EGX30")
         history = self.get_stock_history(index_symbol, days=220)
         if not history["success"] or len(history["data"]) < 30:
-            return {"success": False, "error": history.get("error", "تعذر قراءة حالة السوق")}
+            return {
+                "success": True,
+                "available": False,
+                "symbol": self.normalize_symbol(index_symbol),
+                "date": None,
+                "close": None,
+                "sma20": None,
+                "sma50": None,
+                "return20": None,
+                "regime": "بيانات المؤشر غير متاحة",
+                "message": "بيانات EGX30 غير متاحة حاليًا من مزود الأسعار. تم الاستمرار بدون قراءة المؤشر.",
+            }
         frame = self._series(history["data"])
         close = frame["close"]
         sma20 = close.rolling(20).mean().iloc[-1]
