@@ -19,7 +19,7 @@ except Exception:
 
 
 st.set_page_config(
-    page_title=f"{APP_NAME} • BUILD 2026.09.20",
+    page_title=APP_NAME,
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -109,74 +109,41 @@ st.markdown(
     """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
-:root{
- --bg:#f4f7f5;--surface:#ffffff;--surface2:#f8faf9;--surface3:#eef4f1;
- --border:#dce5e0;--text:#14201b;--muted:#6f7d76;
- --accent:#12a66a;--accent2:#087a4d;--blue:#2878d8;
- --up:#0b9f62;--down:#e34d59;--warning:#c58a14;
-}
+:root{--bg:#0a0d12;--surface:#11161e;--surface2:#171e28;--surface3:#1d2631;--border:#293542;--text:#f4f7f5;--muted:#89959f;--accent:#19c77a;--accent2:#7df0b2;--blue:#5b9cff;--up:#29d98a;--down:#ff6570;--warning:#f1c75b}
 html,body,[class*="css"]{font-family:'Cairo',sans-serif}
-.stApp{background:linear-gradient(180deg,#f8faf9 0%,#f1f6f3 100%);color:var(--text)}
-.main .block-container{direction:rtl;text-align:right;max-width:1540px;padding:32px 42px 70px}
-[data-testid="stSidebar"]{background:#ffffff;border-left:1px solid #dfe8e3;border-right:0;box-shadow:4px 0 24px rgba(24,55,43,.05)}
-[data-testid="stSidebar"]>div:first-child{padding:24px 18px}
+.stApp{background:radial-gradient(circle at 75% -10%,rgba(25,199,122,.14),transparent 27%),radial-gradient(circle at 5% 30%,rgba(91,156,255,.07),transparent 25%),var(--bg);color:var(--text)}
+.main .block-container{direction:rtl;text-align:right;max-width:1540px;padding:30px 42px 70px}
+[data-testid="stSidebar"]{background:linear-gradient(180deg,#0d1117,#090c11);border-left:1px solid #202b35;border-right:0}
+[data-testid="stSidebar"]>div:first-child{padding:24px 16px}
 [data-testid="stSidebar"] *{font-family:'Cairo',sans-serif}
-.brand{padding:8px 8px 22px}
-.brand-title{font-size:25px;font-weight:800;color:#10221a;letter-spacing:-.7px}
-.brand-sub{color:#7b8982;font-size:11px;margin-top:5px}
+.brand{padding:8px 10px 22px}.brand-title{font-size:25px;font-weight:800;color:#fff}.brand-sub{color:#788691;font-size:11px;margin-top:5px}
 [data-testid="stSidebar"] .stRadio>label{display:none}
-[data-testid="stSidebar"] .stRadio [role="radiogroup"]{gap:9px}
-[data-testid="stSidebar"] .stRadio [role="radio"]{
- background:#f7faf8;border-radius:14px;padding:14px 15px;min-height:52px;
- color:#53635c;font-weight:800;border:1px solid #e5ece8;transition:.15s;
-}
-[data-testid="stSidebar"] .stRadio [role="radio"]:hover{background:#edf7f2;color:#17382b;border-color:#cfe4d9}
-[data-testid="stSidebar"] .stRadio [role="radio"][aria-checked="true"]{
- background:#e5f7ee;color:#087a4d;border-color:#a9ddc6;box-shadow:inset -4px 0 0 #12a66a
-}
+[data-testid="stSidebar"] .stRadio [role="radiogroup"]{gap:8px}
+[data-testid="stSidebar"] .stRadio [role="radio"]{background:transparent;border:1px solid transparent;border-radius:14px;padding:14px 15px;min-height:50px;color:#9eabb5;font-weight:800;transition:.15s}
+[data-testid="stSidebar"] .stRadio [role="radio"]:hover{background:#151c24;color:#fff;border-color:#26323d}
+[data-testid="stSidebar"] .stRadio [role="radio"][aria-checked="true"]{background:linear-gradient(90deg,rgba(25,199,122,.18),rgba(25,199,122,.04));color:#b9ffd9;border-color:rgba(25,199,122,.32);box-shadow:inset -4px 0 0 var(--accent)}
 [data-testid="stSidebar"] .stRadio [role="radio"]>div:first-child{display:none}
-.hero{
- background:linear-gradient(135deg,#ffffff 0%,#edf8f3 100%);border:1px solid #d7e8df;
- border-radius:24px;padding:31px 34px;margin-bottom:24px;
- box-shadow:0 12px 35px rgba(25,74,53,.07)
-}
-.hero-title{font-size:31px;font-weight:800;letter-spacing:-1px;color:#10251c}
-.hero-sub{color:#687870;font-size:14px;margin-top:7px}
-.badge{display:inline-block;margin-top:18px;padding:8px 14px;border-radius:999px;
- background:#e8f8f0;border:1px solid #bfe5d1;color:#087a4d;font-size:12px;font-weight:800}
-.badge.gold{background:#fff8df;border-color:#f1df9e;color:#98700b}
-.badge.red{background:#fff0f1;border-color:#f3c3c8;color:#c43e4a}
-.card{
- background:#fff;border:1px solid #dce6e1;border-radius:19px;padding:20px;min-height:116px;
- box-shadow:0 8px 25px rgba(25,55,44,.045)
-}
-.card-label{color:#728078;font-size:12px;font-weight:600}
-.card-value{color:#13231b;font-size:26px;font-weight:800;margin-top:7px}
-.card-note{color:#8a9791;font-size:11px;margin-top:5px}
-.section{font-size:20px;font-weight:800;color:#14251d;margin:29px 0 12px}
-.metric{
- background:#fff;border:1px solid #dce6e1;border-radius:16px;padding:14px 16px;text-align:right;
- box-shadow:0 5px 18px rgba(25,55,44,.035)
-}
-.metric-name{color:#77847e;font-size:11px}.metric-value{color:#14241c;font-size:20px;font-weight:800;margin-top:3px}
-.search-panel{background:#fff;border:1px solid #d8e4de;border-radius:20px;padding:20px;margin-bottom:20px;box-shadow:0 8px 28px rgba(25,55,44,.05)}
-div[data-testid="stTextInput"] input,div[data-baseweb="select"]>div{
- background:#f8fbf9!important;border:1px solid #cfdcd5!important;color:#17251e!important;border-radius:13px!important;min-height:50px
-}
-div[data-testid="stButton"]>button{
- min-height:48px;border-radius:13px;font-family:'Cairo',sans-serif;font-weight:800;
- border:1px solid #cfddd6;background:#fff;color:#173026;transition:.15s;font-size:14px
-}
-div[data-testid="stButton"]>button:hover{border-color:#12a66a;color:#087a4d;background:#eef9f4}
-div[data-testid="stButton"]>button[kind="primary"]{background:#12a66a;color:#fff;border-color:#12a66a;box-shadow:0 7px 18px rgba(18,166,106,.20)}
-div[data-testid="stDownloadButton"]>button{min-height:48px;border-radius:13px;font-family:'Cairo',sans-serif;font-weight:800}
-div[data-testid="stMetric"]{background:#fff;border:1px solid #dce6e1;padding:15px;border-radius:16px}
+.hero{background:linear-gradient(135deg,#18212b 0%,#10161e 62%,#0e141b 100%);border:1px solid #2a3946;border-radius:24px;padding:31px 34px;margin-bottom:24px;box-shadow:0 18px 50px rgba(0,0,0,.22)}
+.hero-title{font-size:31px;font-weight:800;letter-spacing:-1px;color:#fff}.hero-sub{color:#8e9ba5;font-size:14px;margin-top:7px}
+.badge{display:inline-block;margin-top:18px;padding:8px 14px;border-radius:999px;background:rgba(25,199,122,.11);border:1px solid rgba(25,199,122,.30);color:#6ce6a8;font-size:12px;font-weight:800}
+.badge.gold{background:rgba(241,199,91,.11);border-color:rgba(241,199,91,.3);color:#f5d777}.badge.red{background:rgba(255,101,112,.10);border-color:rgba(255,101,112,.28);color:#ff9ca3}
+.card{background:linear-gradient(145deg,#151c25,#10151c);border:1px solid #283642;border-radius:19px;padding:20px;min-height:116px;box-shadow:0 9px 28px rgba(0,0,0,.15)}
+.card-label{color:#8d9aa4;font-size:12px;font-weight:600}.card-value{color:#fff;font-size:26px;font-weight:800;margin-top:7px}.card-note{color:#687681;font-size:11px;margin-top:5px}
+.section{font-size:20px;font-weight:800;color:#f5f8f6;margin:29px 0 12px}
+.metric{background:#121921;border:1px solid #2a3743;border-radius:16px;padding:14px 16px;text-align:right;box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.metric-name{color:#87949e;font-size:11px}.metric-value{color:#fff;font-size:20px;font-weight:800;margin-top:3px}
+.search-panel{background:linear-gradient(145deg,#141c25,#10161d);border:1px solid #2b3945;border-radius:20px;padding:20px;margin-bottom:20px;box-shadow:0 10px 30px rgba(0,0,0,.16)}
+div[data-testid="stTextInput"] input,div[data-baseweb="select"]>div{background:#0b1016!important;border:1px solid #33424e!important;color:#fff!important;border-radius:13px!important;min-height:50px}
+div[data-testid="stButton"]>button{min-height:50px;border-radius:13px;font-family:'Cairo',sans-serif;font-weight:800;border:1px solid #35434f;background:#19212a;color:#f5f8f6;transition:.15s;font-size:14px}
+div[data-testid="stButton"]>button:hover{border-color:var(--accent);color:#b9ffd9;background:#202b34}
+div[data-testid="stButton"]>button[kind="primary"]{background:linear-gradient(135deg,#19c77a,#0eae68);color:#06110b;border-color:#19c77a;box-shadow:0 8px 22px rgba(25,199,122,.22)}
+div[data-testid="stDownloadButton"]>button{min-height:50px;border-radius:13px;font-family:'Cairo',sans-serif;font-weight:800}
+div[data-testid="stMetric"]{background:#121921;border:1px solid #2a3743;padding:15px;border-radius:16px}
 .stAlert{border-radius:14px}
-[data-testid="stDataFrame"]{border:1px solid #d8e4de;border-radius:16px;overflow:hidden}
-hr{border-color:#e2e9e5!important}
-footer{visibility:hidden}
-.small-note{color:#77857e;font-size:11px;line-height:1.9}
-.ai-box{background:linear-gradient(145deg,#f2faf6,#ffffff);border:1px solid #b9dfcb;border-right:4px solid #12a66a;border-radius:19px;padding:21px;line-height:2;white-space:pre-wrap;color:#20352b}
+[data-testid="stDataFrame"]{border:1px solid #293743;border-radius:16px;overflow:hidden}
+hr{border-color:#222d37!important} footer{visibility:hidden}
+.small-note{color:#77858f;font-size:11px;line-height:1.9}
+.ai-box{background:linear-gradient(145deg,#16231f,#11181b);border:1px solid rgba(25,199,122,.25);border-right:4px solid #19c77a;border-radius:19px;padding:21px;line-height:2;white-space:pre-wrap;color:#dceee5}
 </style>
 """,
     unsafe_allow_html=True,
@@ -222,7 +189,7 @@ with st.sidebar:
 # -----------------------------
 if page == "⌂  لوحة التحكم":
     st.markdown(
-        '<div class="hero"><div class="hero-title">مدحت ستوكس AI <span style="font-size:11px;color:#8fb8ff;font-weight:700;vertical-align:middle">BUILD 2026.09.20</span></div>'
+        '<div class="hero"><div class="hero-title">مدحت ستوكس AI</div>'
         '<div class="hero-sub">منصة EGX حديثة — بيانات فعلية، قراءة ذكية، وتجربة سريعة وواضحة بدون زحمة.</div>'
         '<span class="badge">● النظام جاهز للتحليل</span></div>',
         unsafe_allow_html=True,
