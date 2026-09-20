@@ -25,6 +25,16 @@ def health():
 def search(q: str = Query(..., min_length=1), limit: int = Query(12, ge=1, le=50)):
     return {"success": True, "data": engine.search_symbols(q, limit=limit)}
 
+@app.get("/stocks/{symbol}/live")
+def live(symbol: str):
+    result = engine.get_live_quote(symbol)
+    if result.get("success"):
+        return result
+    result = engine.get_latest_price(symbol)
+    if not result.get("success"):
+        raise HTTPException(status_code=404, detail=result.get("error", "لا توجد بيانات"))
+    return {"success": True, "data": result, "provider": "EODHD"}
+
 @app.get("/stocks/{symbol}/latest")
 def latest(symbol: str):
     result = engine.get_latest_price(symbol)
@@ -85,7 +95,15 @@ def fundamentals(symbol: str):
 
 @app.post("/stocks/{symbol}/ai-analysis")
 def ai_analysis(symbol: str):
-    result = engine.ai_analysis(symbol)
+    technical = engine.analyze_stock(symbol)
+    if not technical.get("success"):
+        raise HTTPException(status_code=404, detail=technical.get("error", "تعذر التحليل"))
+    fundamentals = engine.get_company_snapshot(symbol)
+    result = engine.ai_analysis(
+        symbol,
+        technical,
+        fundamentals if fundamentals.get("success") else {},
+    )
     if not result.get("success"):
         raise HTTPException(status_code=502, detail=result.get("error", "تعذر تحليل الذكاء الاصطناعي"))
     return result
