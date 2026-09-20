@@ -95,11 +95,9 @@ def main():
         news_text = "غير متاح" if news is None else f"{float(news):+.2f}"
         setup = html.escape(str(row.get("setup", "—")))
         lines.append(
-            f"<b>{index}. {symbol}</b> — فرصة {score}/100
-"
-            f"ارتداد {rebound}/100 • مخاطر {risk}/100 • RSI {rsi}
-"
-            f"الأخبار {news_text} • {setup}"
+            f"<b>{index}. {symbol}</b> — فرصة {score}/100\n"
+            f"ارتداد {rebound}/100 • مخاطر {risk}/100 • RSI {rsi}\n"
+            f"الأخبار {news_text} • {setup}" 
         )
         lines.append("")
 
