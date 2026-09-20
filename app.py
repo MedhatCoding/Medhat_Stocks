@@ -614,30 +614,70 @@ elif page == "◉  السوق":
 # -----------------------------
 elif page == "✦  الفرص":
     st.markdown(
-        '<div class="hero"><div class="hero-title">الفرص</div>'
-        '<div class="hero-sub">لا نعرض «أفضل سهم» أو ترتيباً إجبارياً. هذه الصفحة تعرض فقط الأسهم التي طلبت تحليلها واحتفظت بها.</div></div>',
+        '<div class="hero"><div class="hero-title">الفرص والتوصيات التحليلية</div>'
+        '<div class="hero-sub">فحص آلي لأسهم EGX من القائمة الشرعية المرجعية، مع درجة فرصة، ارتداد، مخاطر، وسيناريو سعري محسوب من ATR. ليست أمراً بالشراء أو البيع.</div></div>',
         unsafe_allow_html=True,
     )
-    if not st.session_state.watchlist:
-        st.info("قائمة المتابعة فارغة. أضف الأسهم من صفحة البحث والتحليل.")
+
+    with st.spinner("جاري فحص الأسهم المرشحة وتحليل السوق والأخبار..."):
+        opportunities = data_engine.get_opportunities(limit=20)
+
+    if not opportunities.get("success"):
+        st.error(opportunities.get("error", "تعذر تشغيل فحص الفرص."))
+    elif not opportunities.get("data"):
+        st.info("لا توجد حالياً فرصة تستوفي شروط الفحص. هذا أفضل من عرض سهم بلا إشارة كافية.")
     else:
-        rows = []
-        for symbol in st.session_state.watchlist:
-            result = data_engine.analyze_stock(symbol)
-            if result["success"]:
-                rows.append({
-                    "السهم": result["symbol"].replace(".EGX", ""),
-                    "الحالة": result["status"],
-                    "درجة الفرصة": result["opportunity_score"],
-                    "المخاطر": result["risk_score"],
-                    "RSI": round(result["rsi14"], 2) if result["rsi14"] is not None else None,
-                    "التغير 20ج": pct(result["return20"]),
-                    "آخر إغلاق": money(result["close"]),
-                })
-        if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-        else:
-            st.warning("تعذر تحديث عناصر قائمة المتابعة حالياً.")
+        market = opportunities.get("market", {})
+        if market.get("success"):
+            st.markdown(
+                f'<div class="premarket"><div class="premarket-title">حالة السوق قبل الافتتاح</div>'
+                f'<div class="premarket-time">آخر جلسة مكتملة: {market.get("date","—")} • EGX30: {money(market.get("close"))}</div>'
+                f'<div class="premarket-body">النظام يدمج حالة السوق مع التحليل الفني والأخبار والفلترة الشرعية.</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('<div class="section">المرشحون اليوم</div>', unsafe_allow_html=True)
+        for i, row in enumerate(opportunities["data"][:10], 1):
+            symbol = row.get("symbol", "—")
+            sharia = row.get("sharia_compliant") is True
+            st.markdown(
+                f'<div class="m-card-grid">'
+                f'{app_card("السهم", symbol, row.get("name",""))}'
+                f'{app_card("درجة الفرصة", row.get("opportunity_score","—"), "من 100")}'
+                f'{app_card("الارتداد", row.get("rebound_score","—"), row.get("setup",""))}'
+                f'{app_card("المخاطر", row.get("risk_score","—"), "من 100")}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.metric("مرجع الدخول", money(row.get("entry_reference")))
+            with c2:
+                st.metric("هدف 1 ATR", money(row.get("target1")))
+            with c3:
+                st.metric("إلغاء السيناريو", money(row.get("invalidation")))
+            st.caption(
+                f"RSI {money(row.get('rsi14'))} • تغير 20 جلسة {pct(row.get('return20'))} • "
+                f"نسبة الحجم {money(row.get('volume_ratio'))} • الأخبار {money(row.get('news_score'))}"
+            )
+            if st.button("⭐ إضافة للمتابعة", key=f"opp_watch_{symbol}_{i}", use_container_width=True):
+                add_watchlist(symbol)
+                st.success(f"تمت إضافة {symbol} لقائمة المتابعة.")
+            st.markdown("---")
+
+        st.markdown('<div class="section">لماذا ظهر هذا السهم؟</div>', unsafe_allow_html=True)
+        st.info(
+            "المرشح يُبنى من الاتجاه الفني، مؤشرات الارتداد، المخاطر، حالة EGX30، "
+            "والمشاعر الخبرية عند توفرها. لا يتم اعتبار السهم فرصة مؤهلة إلا بعد اجتياز شروط الفحص."
+        )
+
+        st.markdown('<div class="section">كل نتائج الفحص</div>', unsafe_allow_html=True)
+        table = pd.DataFrame(opportunities["data"])
+        cols = [c for c in [
+            "symbol", "name", "opportunity_score", "rebound_score", "risk_score",
+            "rsi14", "return20", "volume_ratio", "news_score", "setup"
+        ] if c in table.columns]
+        st.dataframe(table[cols], use_container_width=True, hide_index=True)
 
 
 # -----------------------------
