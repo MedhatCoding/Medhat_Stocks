@@ -109,94 +109,74 @@ st.markdown(
     """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
-
-:root {
-  --bg:#080d13;
-  --panel:#0f1721;
-  --panel2:#121d29;
-  --border:#233142;
-  --text:#eef3f7;
-  --muted:#8b9aaa;
-  --gold:#d6b35a;
-  --gold2:#f4d27a;
-  --accent:#4f8cff;
-  --green:#35c98a;
-  --red:#ef6b73;
-  --blue:#62a7ff;
+:root{
+ --bg:#07090d;--surface:#10141b;--surface2:#151b24;--surface3:#1b222d;
+ --border:#28313d;--text:#f5f7fa;--muted:#8d98a7;
+ --accent:#b7f34a;--accent2:#d5ff7a;--blue:#6ea8ff;
+ --up:#39d98a;--down:#ff626d;--warning:#f4c95d;
 }
-
-html, body, [class*="css"] { font-family:'Cairo',sans-serif; }
-.stApp { background:radial-gradient(circle at 12% 0%,rgba(79,140,255,.09),transparent 28%),linear-gradient(180deg,#060a0f 0%,#0a1119 48%,#070c12 100%); color:var(--text); }
-.main .block-container { direction:rtl; text-align:right; max-width:1540px; padding:18px 24px 44px; }
-[data-testid="stSidebar"] {
-  background:linear-gradient(180deg,#0d151e,#090f16);
-  border-left:1px solid #263545;
-  border-right:0;
+html,body,[class*="css"]{font-family:'Cairo',sans-serif}
+.stApp{background:radial-gradient(circle at 80% -10%,rgba(183,243,74,.08),transparent 28%),#07090d;color:var(--text)}
+.main .block-container{direction:rtl;text-align:right;max-width:1500px;padding:28px 38px 60px}
+[data-testid="stSidebar"]{background:#0b0e13;border-left:1px solid #202733;border-right:0}
+[data-testid="stSidebar"]>div:first-child{padding:22px 16px}
+[data-testid="stSidebar"] *{font-family:'Cairo',sans-serif}
+.brand{padding:6px 8px 20px}
+.brand-title{font-size:23px;font-weight:800;color:#fff;letter-spacing:-.5px}
+.brand-sub{color:#788493;font-size:11px;margin-top:4px}
+[data-testid="stSidebar"] .stRadio>label{display:none}
+[data-testid="stSidebar"] .stRadio [role="radiogroup"]{gap:7px}
+[data-testid="stSidebar"] .stRadio [role="radio"]{
+ background:transparent;border-radius:12px;padding:11px 13px;min-height:44px;
+ color:#aeb7c3;font-weight:700;border:1px solid transparent;transition:.15s;
 }
-[data-testid="stSidebar"] * { font-family:'Cairo',sans-serif; }
-[data-testid="stSidebar"] .stRadio label { color:#bdc8d3; font-weight:700; }
-[data-testid="stSidebar"] .stRadio label:hover { color:#ffd875; }
-
-.brand { padding:8px 2px 14px; }
-.brand-title { font-size:21px; font-weight:800; color:#fff; }
-.brand-sub { color:var(--muted); font-size:12px; margin-top:3px; }
-
-.hero {
-  background:linear-gradient(145deg,rgba(20,31,44,.98),rgba(10,16,23,.98));
-  border:1px solid #2d3d50; border-radius:16px; padding:22px 26px;
-  margin-bottom:18px; box-shadow:0 10px 28px rgba(0,0,0,.22);
+[data-testid="stSidebar"] .stRadio [role="radio"]:hover{background:#151b23;color:#fff;border-color:#252f3b}
+[data-testid="stSidebar"] .stRadio [role="radio"][aria-checked="true"]{
+ background:linear-gradient(90deg,rgba(183,243,74,.16),rgba(183,243,74,.04));
+ color:#e8ffbd;border-color:rgba(183,243,74,.30);box-shadow:inset 3px 0 0 var(--accent)
 }
-.hero-title { font-size:27px; font-weight:800; letter-spacing:-.4px; color:#fff; }
-.hero-sub { color:var(--muted); font-size:13px; margin-top:4px; }
-.badge { display:inline-block; margin-top:16px; padding:6px 12px; border-radius:999px;
-  background:rgba(53,201,138,.10); border:1px solid rgba(53,201,138,.24);
-  color:#70e5ae; font-size:12px; font-weight:700; }
-.badge.gold { background:rgba(214,179,90,.10); border-color:rgba(214,179,90,.25); color:var(--gold2); }
-.badge.red { background:rgba(239,107,115,.10); border-color:rgba(239,107,115,.25); color:#ff9ca3; }
-
-.card {
-  background:linear-gradient(145deg,#111b27,#0d151e);
-  border:1px solid #2a3a4c; border-radius:16px; padding:17px 18px; min-height:102px;
+[data-testid="stSidebar"] .stRadio [role="radio"]>div:first-child{display:none}
+.hero{
+ background:linear-gradient(135deg,#151b24,#0d1117);border:1px solid #293441;
+ border-radius:20px;padding:27px 30px;margin-bottom:22px;
+ box-shadow:0 18px 45px rgba(0,0,0,.20)
 }
-.card-label { color:var(--muted); font-size:12px; }
-.card-value { color:#fff; font-size:22px; font-weight:800; margin-top:6px; }
-.card-note { color:#68798a; font-size:11px; margin-top:5px; }
-
-.section { font-size:17px; font-weight:800; color:#f7f9fb; margin:20px 0 9px; }
-.metric {
-  background:linear-gradient(145deg,#101b28,#0c151f); border:1px solid #27384a; border-radius:14px;
-  padding:11px 13px; text-align:right;
+.hero-title{font-size:29px;font-weight:800;letter-spacing:-.8px;color:#fff}
+.hero-sub{color:#8e9aaa;font-size:13px;margin-top:6px}
+.badge{display:inline-block;margin-top:17px;padding:7px 13px;border-radius:999px;
+ background:rgba(57,217,138,.10);border:1px solid rgba(57,217,138,.25);color:#70e6aa;font-size:12px;font-weight:700}
+.badge.gold{background:rgba(183,243,74,.10);border-color:rgba(183,243,74,.28);color:#d8ff91}
+.badge.red{background:rgba(255,98,109,.10);border-color:rgba(255,98,109,.25);color:#ff9da4}
+.card{
+ background:linear-gradient(145deg,#151b24,#0f141b);border:1px solid #27313d;
+ border-radius:17px;padding:18px 19px;min-height:108px
 }
-.metric-name { color:var(--muted); font-size:11px; }
-.metric-value { color:#fff; font-size:18px; font-weight:800; margin-top:3px; }
-
-.search-panel {
-  background:linear-gradient(145deg,#101a26,#0c141d); border:1px solid #27384a; border-radius:16px;
-  padding:13px 15px; margin-bottom:16px;
+.card-label{color:#8c97a6;font-size:12px}
+.card-value{color:#fff;font-size:24px;font-weight:800;margin-top:7px}
+.card-note{color:#687483;font-size:11px;margin-top:5px}
+.section{font-size:18px;font-weight:800;color:#f7f9fb;margin:26px 0 11px}
+.metric{
+ background:#111720;border:1px solid #293440;border-radius:15px;padding:13px 15px;text-align:right
 }
-div[data-testid="stTextInput"] input, div[data-baseweb="select"] > div {
-  background:#0a1118 !important; border-color:#2b3a4a !important;
-  color:#fff !important; border-radius:12px !important;
+.metric-name{color:#8c97a6;font-size:11px}.metric-value{color:#fff;font-size:19px;font-weight:800;margin-top:3px}
+.search-panel{background:#111720;border:1px solid #293440;border-radius:17px;padding:17px 18px;margin-bottom:18px}
+div[data-testid="stTextInput"] input,div[data-baseweb="select"]>div{
+ background:#0b0f15!important;border:1px solid #303b48!important;color:#fff!important;border-radius:12px!important;min-height:44px
 }
-div[data-testid="stButton"] > button {
-  min-height:38px; border-radius:9px; font-family:'Cairo',sans-serif; font-weight:800;
-  border:1px solid #334252; background:linear-gradient(180deg,#1a2b3e,#111d2a); color:#f7f9fb;
+div[data-testid="stButton"]>button{
+ min-height:44px;border-radius:11px;font-family:'Cairo',sans-serif;font-weight:800;
+ border:1px solid #344150;background:#171e28;color:#f5f7fa;transition:.15s
 }
-div[data-testid="stButton"] > button:hover { border-color:var(--accent); color:#fff; background:linear-gradient(180deg,#21364d,#172637); }
-div[data-testid="stDownloadButton"] > button {
-  min-height:40px; border-radius:10px; font-family:'Cairo',sans-serif; font-weight:800;
-}
-div[data-testid="stMetric"] { background:#0e1721; border:1px solid var(--border); padding:12px; border-radius:14px; }
-.stAlert { border-radius:14px; }
-[data-testid="stDataFrame"] { border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-hr { border-color:var(--border) !important; }
-footer { visibility:hidden; }
-.small-note { color:#748495; font-size:11px; line-height:1.8; }
-.ai-box {
-  background:linear-gradient(145deg,rgba(31,42,57,.75),rgba(14,21,29,.95));
-  border:1px solid rgba(214,179,90,.25); border-radius:18px; padding:18px;
-  line-height:2; white-space:pre-wrap;
-}
+div[data-testid="stButton"]>button:hover{border-color:var(--accent);color:#efffcf;background:#202a34}
+div[data-testid="stButton"]>button[kind="primary"]{background:var(--accent);color:#090b0d;border-color:var(--accent)}
+div[data-testid="stDownloadButton"]>button{min-height:44px;border-radius:11px;font-family:'Cairo',sans-serif;font-weight:800}
+div[data-testid="stMetric"]{background:#111720;border:1px solid #293440;padding:14px;border-radius:15px}
+.stAlert{border-radius:14px}
+[data-testid="stDataFrame"]{border:1px solid #293440;border-radius:15px;overflow:hidden}
+hr{border-color:#222b36!important}
+footer{visibility:hidden}
+.small-note{color:#748090;font-size:11px;line-height:1.9}
+.ai-box{background:linear-gradient(145deg,#151c26,#0f141b);border:1px solid rgba(183,243,74,.22);border-radius:18px;padding:20px;line-height:2;white-space:pre-wrap}
 </style>
 """,
     unsafe_allow_html=True,
@@ -217,13 +197,13 @@ with st.sidebar:
     page = st.radio(
         "NAV",
         [
-            "لوحة التحكم",
-            "السوق",
-            "الفرص",
-            "قائمة المتابعة",
-            "المحفظة",
-            "البحث والتحليل",
-            "الإعدادات",
+            "⌂  لوحة التحكم",
+            "◉  السوق",
+            "✦  الفرص",
+            "☆  قائمة المتابعة",
+            "▣  المحفظة",
+            "⌕  البحث والتحليل",
+            "⚙  الإعدادات",
         ],
         label_visibility="collapsed",
     )
@@ -240,10 +220,10 @@ with st.sidebar:
 # -----------------------------
 # Dashboard
 # -----------------------------
-if page == "لوحة التحكم":
+if page == "⌂  لوحة التحكم":
     st.markdown(
         '<div class="hero"><div class="hero-title">مدحت ستوكس AI <span style="font-size:11px;color:#8fb8ff;font-weight:700;vertical-align:middle">BUILD 2026.09.20</span></div>'
-        '<div class="hero-sub">لوحة احترافية لتحليل EGX — بيانات فعلية، مؤشرات كمية، وشرح ذكي بدون ضوضاء.</div>'
+        '<div class="hero-sub">منصة EGX حديثة — بيانات فعلية، قراءة ذكية، وتجربة سريعة وواضحة بدون زحمة.</div>'
         '<span class="badge">● النظام جاهز للتحليل</span></div>',
         unsafe_allow_html=True,
     )
@@ -311,7 +291,7 @@ if page == "لوحة التحكم":
 # -----------------------------
 # Market
 # -----------------------------
-elif page == "السوق":
+elif page == "◉  السوق":
     st.markdown(
         '<div class="hero"><div class="hero-title">السوق المصري</div>'
         '<div class="hero-sub">قراءة السوق هنا مبنية على آخر تحليل تم تشغيله فعلياً، بدون أرقام وهمية.</div></div>',
@@ -344,7 +324,7 @@ elif page == "السوق":
 # -----------------------------
 # Opportunities
 # -----------------------------
-elif page == "الفرص":
+elif page == "✦  الفرص":
     st.markdown(
         '<div class="hero"><div class="hero-title">الفرص</div>'
         '<div class="hero-sub">لا نعرض «أفضل سهم» أو ترتيباً إجبارياً. هذه الصفحة تعرض فقط الأسهم التي طلبت تحليلها واحتفظت بها.</div></div>',
@@ -375,7 +355,7 @@ elif page == "الفرص":
 # -----------------------------
 # Watchlist
 # -----------------------------
-elif page == "قائمة المتابعة":
+elif page == "☆  قائمة المتابعة":
     st.markdown(
         '<div class="hero"><div class="hero-title">قائمة المتابعة</div>'
         '<div class="hero-sub">قائمة محلية داخل جلسة التطبيق. لا تحتاج قاعدة بيانات لتجربة النسخة الحالية.</div></div>',
@@ -405,7 +385,7 @@ elif page == "قائمة المتابعة":
 # -----------------------------
 # Portfolio
 # -----------------------------
-elif page == "المحفظة":
+elif page == "▣  المحفظة":
     st.markdown(
         '<div class="hero"><div class="hero-title">المحفظة</div>'
         '<div class="hero-sub">تتبع المراكز داخل الجلسة الحالية مع حساب القيمة والتغير بناءً على آخر بيانات EOD.</div></div>',
@@ -460,7 +440,7 @@ elif page == "المحفظة":
 # -----------------------------
 # Research / analysis
 # -----------------------------
-elif page == "البحث والتحليل":
+elif page == "⌕  البحث والتحليل":
     st.markdown(
         '<div class="hero"><div class="hero-title">البحث والتحليل</div>'
         '<div class="hero-sub">ابحث بالرمز أو اسم الشركة. البيانات من السوق أولاً، ثم التحليل الكمي، ثم شرح AI عند الطلب.</div></div>',
@@ -480,7 +460,7 @@ elif page == "البحث والتحليل":
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        analyze = st.button("🔎 تشغيل التحليل", use_container_width=True)
+        analyze = st.button("🔎  تشغيل التحليل", use_container_width=True, type="primary")
     with c2:
         ai_enabled = st.checkbox("تشغيل شرح Gemini", value=True)
     with c3:
@@ -621,7 +601,7 @@ elif page == "البحث والتحليل":
 # -----------------------------
 # Settings
 # -----------------------------
-elif page == "الإعدادات":
+elif page == "⚙  الإعدادات":
     st.markdown(
         '<div class="hero"><div class="hero-title">الإعدادات وحالة النظام</div>'
         '<div class="hero-sub">كل الأسرار تُقرأ من Streamlit Secrets ولا يتم عرض قيمها داخل التطبيق.</div></div>',
