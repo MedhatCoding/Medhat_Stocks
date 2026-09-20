@@ -82,6 +82,36 @@ class DataEngine:
         except ValueError as exc:
             return {"success": False, "error": f"استجابة غير صالحة من مزود البيانات: {exc}"}
 
+    def _oanor_get(self, path, params=None, timeout=20):
+        if not self.oanor_api_key:
+            return {"success": False, "error": "OANOR_API_KEY غير موجود"}
+        try:
+            response = requests.get(
+                f"https://api.oanor.com/{path.lstrip('/')}",
+                params=dict(params or {}),
+                headers={"x-oanor-key": self.oanor_api_key},
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            return {"success": True, "data": response.json()}
+        except requests.RequestException as exc:
+            return {"success": False, "error": str(exc)}
+        except ValueError as exc:
+            return {"success": False, "error": f"استجابة OANOR غير صالحة: {exc}"}
+
+    def get_live_quote(self, symbol):
+        code = self.display_symbol(symbol)
+        result = self._oanor_get("egx-api/v1/quote", {"symbol": code}, timeout=15)
+        if not result["success"]:
+            return result
+        data = result["data"]
+        rows = data.get("data") if isinstance(data, dict) else data
+        if isinstance(rows, dict):
+            rows = [rows]
+        if not rows:
+            return {"success": False, "error": "لا توجد تسعيرة حية"}
+        return {"success": True, "data": rows[0]}
+
     @st.cache_data(ttl=3600, show_spinner=False)
     def get_egx_symbols(_self):
         result = _self._get(f"exchange-symbol-list/{_self.EGX_EXCHANGE}")
@@ -350,9 +380,13 @@ class DataEngine:
             "valuation_pe": valuation.get("TrailingPE") or valuation.get("ForwardPE"),
         }
 
-    def ai_analysis(self, symbol, technical, fundamentals=None):
+    def ai_analysis(self, symbol, technical=None, fundamentals=None):
         if not self.gemini_api_key:
             return {"success": False, "error": "GEMINI_API_KEY غير موجود"}
+        if technical is None:
+            technical = self.analyze_stock(symbol)
+            if not technical.get("success"):
+                return technical
         payload = {
             "السهم": self.display_symbol(symbol),
             "التاريخ": technical.get("date"),
@@ -414,7 +448,32 @@ class DataEngine:
 
 
     def get_news(self, symbol=None, limit=8):
-        params = {"limit": max(1, min(int(limit), 20))}
+        limit = max(1, min(int(limit), 20))
+        if self.oanor_api_key:
+            query = self.display_symbol(symbol) if symbol else "Egyptian Exchange EGX stocks"
+            oanor = self._oanor_get("news-api/v1/search", {"q": query, "limit": limit, "language": "en"}, timeout=20)
+            if oanor["success"]:
+                payload = oanor["data"]
+                rows = payload.get("articles") if isinstance(payload, dict) else payload
+                if isinstance(rows, list):
+                    clean = []
+                    for row in rows:
+                        if not isinstance(row, dict):
+                            continue
+                        clean.append({
+                            "date": row.get("published_at") or row.get("publishedAt") or row.get("date"),
+                            "title": row.get("title") or "",
+                            "content": row.get("snippet") or row.get("description") or row.get("content") or "",
+                            "link": row.get("url") or row.get("link") or "",
+                            "polarity": self._num(row.get("polarity")),
+                            "positive": self._num(row.get("positive")),
+                            "negative": self._num(row.get("negative")),
+                            "source": row.get("publisher") or row.get("source") or "OANOR",
+                        })
+                    if clean:
+                        return {"success": True, "data": clean, "provider": "OANOR"}
+
+        params = {"limit": limit}
         if symbol:
             params["s"] = self.normalize_symbol(symbol)
         result = self._get("news", params=params, timeout=30)
@@ -434,8 +493,9 @@ class DataEngine:
                 "polarity": self._num(sentiment.get("polarity")),
                 "positive": self._num(sentiment.get("pos")),
                 "negative": self._num(sentiment.get("neg")),
+                "source": "EODHD",
             })
-        return {"success": True, "data": clean}
+        return {"success": True, "data": clean, "provider": "EODHD"}
 
     def get_market_context(self):
         index_symbol = os.getenv("EGX_INDEX_SYMBOL", "EGX30")
@@ -500,7 +560,12 @@ class DataEngine:
             if symbol not in SHARIA_SYMBOLS: continue
             analysis = _self.analyze_stock(symbol)
             if not analysis.get("success"): continue
-            setup = _self._opportunity_setup(analysis, market)
+            news = _self.get_news(symbol, limit=5)
+            news_rows = news.get("data", []) if news.get("success") else []
+            polarities = [_self._num(x.get("polarity")) for x in news_rows]
+            polarities = [x for x in polarities if x is not None]
+            news_score = (sum(polarities) / len(polarities)) if polarities else None
+            setup = _self._opportunity_setup(analysis, market, news_score)
             if setup["rebound_score"] < 30: continue
             rows.append({"symbol": symbol, "name": item.get("name") or symbol, "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE})
         rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
