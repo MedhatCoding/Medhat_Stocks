@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,6 +38,43 @@ def analysis(symbol: str):
     if not result.get("success"):
         raise HTTPException(status_code=404, detail=result.get("error", "تعذر التحليل"))
     return result
+
+@app.get("/market/context")
+def market_context():
+    return engine.get_market_context()
+
+@app.get("/opportunities")
+def opportunities(limit: int = Query(20, ge=1, le=40)):
+    result = engine.get_opportunities(limit=limit)
+    if not result.get("success"):
+        raise HTTPException(status_code=502, detail=result.get("error", "تعذر تحميل الفرص"))
+    return result
+
+@app.get("/stocks/{symbol}/full-analysis")
+def full_analysis(symbol: str):
+    result = engine.get_full_analysis(symbol)
+    if not result.get("success"):
+        raise HTTPException(status_code=404, detail=result.get("error", "تعذر التحليل"))
+    return result
+
+@app.get("/stocks/{symbol}/news")
+def stock_news(symbol: str, limit: int = Query(8, ge=1, le=20)):
+    result = engine.get_news(symbol, limit=limit)
+    if not result.get("success"):
+        raise HTTPException(status_code=502, detail=result.get("error", "تعذر جلب الأخبار"))
+    return result
+
+@app.get("/stocks/{symbol}/sharia")
+def sharia(symbol: str):
+    from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE
+    code = engine.display_symbol(symbol)
+    return {
+        "symbol": code,
+        "compliant": code in SHARIA_SYMBOLS,
+        "source": REFERENCE_SOURCE,
+        "reference_date": REFERENCE_DATE,
+        "reference_count": len(SHARIA_SYMBOLS),
+    }
 
 @app.get("/stocks/{symbol}/fundamentals")
 def fundamentals(symbol: str):
