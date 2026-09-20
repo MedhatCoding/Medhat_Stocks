@@ -104,3 +104,5 @@ elif page == "الإعدادات":
         with col: st.markdown(f'<div class="card"><div class="card-label">{label}</div><div class="card-value">{"متصل" if health[key] else "غير متصل"}</div><div class="card-note">{note}</div></div>',unsafe_allow_html=True)
     st.markdown('<div class="section-title">حالة النظام</div>',unsafe_allow_html=True)
     st.json(health)
+
+# GitHub write test: this line confirms that the connector can modify existing files.
