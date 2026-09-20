@@ -102,8 +102,7 @@ def main():
         lines.append("")
 
     lines.append("⚠️ <i>هذه مرشحات تحليلية وليست أمراً بالشراء أو البيع. البيانات الفعلية فقط، ولا تُرسل رسالة عند عدم وجود فرصة مؤهلة.</i>")
-    send_telegram(token, chat_id, "
-".join(lines))
+    send_telegram(token, chat_id, "\n".join(lines))
     print(f"Telegram sent: {len(rows[:5])} opportunities.")
 
 
