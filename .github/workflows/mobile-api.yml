@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r api/requirements.txt
-      - run: python -m py_compile api/main.py data_engine.py
+      - run: python -m py_compile api/main.py data_engine.py scripts/telegram_daily.py
       - run: python -c "from api.main import app; print(app.title)"
 
   flutter:
