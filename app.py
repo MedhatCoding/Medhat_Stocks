@@ -478,60 +478,64 @@ st.markdown(
 # Dashboard
 # -----------------------------
 if page == "⌂  الرئيسية":
-    last = st.session_state.last_analysis
-
     st.markdown(
         '<div class="hero"><div class="hero-title">صباح السوق 👋</div>'
-        '<div class="hero-sub">مدحت ستوكس — شاشة متابعة EGX قبل القرار، في مكان واحد وبشكل سريع.</div>'
+        '<div class="hero-sub">شاشة EGX قبل الافتتاح: حالة السوق، آخر جلسة مكتملة، والفرص المؤهلة في مكان واحد.</div>'
         '<span class="badge">● التحليل قبل افتتاح السوق</span></div>',
         unsafe_allow_html=True,
     )
 
-    if last:
+    with st.spinner("جاري تجهيز تقرير ما قبل الافتتاح..."):
+        premarket = data_engine.get_premarket_report(limit=5)
+
+    if premarket.get("success"):
+        market = premarket["market"]
+        market_regime = market.get("regime", "غير متاح")
         st.markdown(
-            f'<div class="premarket"><div class="premarket-title">تحليل ما قبل الافتتاح</div>'
-            f'<div class="premarket-time">آخر جلسة: {last["date"]} • آخر سهم: {last["symbol"].replace(".EGX","")}</div>'
-            f'<div class="premarket-body">الحالة <b>{last["status"]}</b> • درجة الفرصة '
-            f'<b>{last["opportunity_score"]}</b> • المخاطر <b>{last["risk_score"]}</b>. '
-            f'هذه قراءة كمية وصفية وليست توصية شراء أو بيع.</div></div>',
+            f'<div class="premarket"><div class="premarket-title">تقرير ما قبل الافتتاح</div>'
+            f'<div class="premarket-time">آخر جلسة مكتملة: {premarket.get("latest_session_date","—")} • '
+            f'وقت القاهرة: {premarket.get("time","—")}</div>'
+            f'<div class="premarket-body">حالة EGX30: <b>{market_regime}</b> • '
+            f'قيمة المؤشر: <b>{money(market.get("close"))}</b> • '
+            f'تغير 20 جلسة: <b>{pct(market.get("return20"))}</b><br>'
+            f'الفرص المؤهلة في الفحص: <b>{len(premarket.get("opportunities", []))}</b> • '
+            f'المرجع الشرعي: <b>{premarket.get("sharia_universe_count", len(SHARIA_SYMBOLS))}</b> سهم.</div></div>',
             unsafe_allow_html=True,
         )
+        if premarket.get("opportunities"):
+            st.markdown('<div class="section">الفرص المؤهلة الآن</div>', unsafe_allow_html=True)
+            for row in premarket["opportunities"][:5]:
+                st.markdown(
+                    '<div class="m-card-grid">'
+                    f'{app_card("السهم", row.get("symbol","—"), row.get("name",""))}'
+                    f'{app_card("الفرصة", row.get("opportunity_score","—"), "من 100")}'
+                    f'{app_card("الارتداد", row.get("rebound_score","—"), row.get("setup",""))}'
+                    f'{app_card("المخاطر", row.get("risk_score","—"), "من 100")}'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(f'⌕ تحليل {row.get("symbol","")}', key=f'home_analyze_{row.get("symbol","")}', use_container_width=True):
+                    st.session_state.mobile_page = "⌕  تحليل"
+                    st.session_state.prefill_symbol = row.get("symbol","")
+                    st.rerun()
+        else:
+            st.info("لا توجد حالياً فرصة تستوفي شروط الفحص؛ التطبيق لا يعرض فرصة مصطنعة.")
     else:
-        st.markdown(
-            '<div class="premarket"><div class="premarket-title">تحليل ما قبل الافتتاح</div>'
-            '<div class="premarket-time">جاهز — لم يتم تشغيل تحليل لسهم بعد</div>'
-            '<div class="premarket-body">ابدأ بتحليل سهم من شاشة «تحليل» لتظهر هنا آخر قراءة فعلية.</div></div>',
-            unsafe_allow_html=True,
-        )
+        st.error(premarket.get("error", "تعذر تجهيز تقرير ما قبل الافتتاح."))
 
-    with st.spinner("جاري تجهيز قراءة السوق والفرص..."):
-        home_opps = data_engine.get_opportunities(limit=5)
-    if home_opps.get("success") and home_opps.get("data"):
-        st.markdown('<div class="section">الفرص الحالية</div>', unsafe_allow_html=True)
-        for row in home_opps["data"][:5]:
-            st.markdown(
-                f'<div class="m-card-grid">'
-                f'{app_card("السهم", row.get("symbol","—"), row.get("name",""))}'
-                f'{app_card("الفرصة", row.get("opportunity_score","—"), "من 100")}'
-                f'{app_card("الارتداد", row.get("rebound_score","—"), row.get("setup",""))}'
-                f'{app_card("المخاطر", row.get("risk_score","—"), "من 100")}'
-                '</div>', unsafe_allow_html=True)
-    elif home_opps.get("success"):
-        st.info("لا توجد حالياً فرصة مؤهلة وفق شروط الفحص.")
-
+    last = st.session_state.last_analysis
+    cards = [
+        ("الأسهم المستهدفة", STOCK_UNIVERSE_SIZE, "هدف المنصة"),
+        ("المرجع الشرعي", len(SHARIA_SYMBOLS), f"حتى {REFERENCE_DATE}"),
+        ("قائمة المتابعة", len(st.session_state.watchlist), "محفوظة في الجلسة الحالية"),
+        ("المحفظة", len(st.session_state.portfolio), "مراكز حالية"),
+    ]
     if last:
         cards = [
-            ("السعر", money(last["close"]), "آخر إغلاق"),
-            ("التغير", pct(last["change_pct"]), "الجلسة الأخيرة"),
-            ("RSI 14", money(last["rsi14"]), "الزخم"),
-            ("الفرصة", last["opportunity_score"], "درجة وصفية"),
-        ]
-    else:
-        cards = [
-            ("الأسهم المستهدفة", STOCK_UNIVERSE_SIZE, "هدف المنصة"),
-            ("المرجع الشرعي", len(SHARIA_SYMBOLS), f"حتى {REFERENCE_DATE}"),
-            ("قائمة المتابعة", len(st.session_state.watchlist), "جلسة حالية"),
-            ("المحفظة", len(st.session_state.portfolio), "مراكز حالية"),
+            ("آخر إغلاق", money(last.get("close")), last.get("symbol","").replace(".EGX","")),
+            ("التغير", pct(last.get("change_pct")), "الجلسة الأخيرة"),
+            ("RSI 14", money(last.get("rsi14")), "الزخم"),
+            ("درجة الفرصة", last.get("final_opportunity_score", last.get("opportunity_score","—")), "السيناريو الحالي"),
         ]
 
     st.markdown('<div class="m-shell"><div class="m-card-grid">', unsafe_allow_html=True)
@@ -540,55 +544,27 @@ if page == "⌂  الرئيسية":
     st.markdown('</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section">اختصارات</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="action-grid">'
-        + app_action("⌕", "تحليل سهم", "بيانات + مؤشرات + AI")
-        + app_action("✦", "الفرص", "الأسهم التي تتابعها")
-        + app_action("☆", "قائمة المتابعة", "مراقبة سريعة")
-        + app_action("▣", "المحفظة", "مراكزك وقيمتها")
-        + '</div>',
-        unsafe_allow_html=True,
-    )
     q1, q2 = st.columns(2)
     with q1:
         if st.button("⌕ فتح التحليل", use_container_width=True, type="primary"):
-            st.session_state.jump_page = "⌕  تحليل"
+            st.session_state.mobile_page = "⌕  تحليل"
             st.rerun()
     with q2:
         if st.button("✦ فتح الفرص", use_container_width=True):
-            st.session_state.jump_page = "✦  الفرص"
+            st.session_state.mobile_page = "✦  الفرص"
             st.rerun()
 
-    st.markdown('<div class="section">آخر قراءة</div>', unsafe_allow_html=True)
     if last:
+        st.markdown('<div class="section">آخر قراءة</div>', unsafe_allow_html=True)
         st.markdown(
-            f'<div class="m-card-grid">'
-            f'{app_card("الدعم", money(last["support"]), "مستوى مقاس")}'
-            f'{app_card("المقاومة", money(last["resistance"]), "مستوى مقاس")}'
-            f'{app_card("SMA 20", money(last["sma20"]), "متوسط")}'
-            f'{app_card("SMA 50", money(last["sma50"]), "متوسط")}'
-            f'</div>',
+            '<div class="m-card-grid">'
+            f'{app_card("الدعم", money(last.get("support")), "مستوى")}'
+            f'{app_card("المقاومة", money(last.get("resistance")), "مستوى")}'
+            f'{app_card("هدف 1", money(last.get("target1")), "ATR")}'
+            f'{app_card("إلغاء", money(last.get("invalidation")), "السيناريو")}'
+            '</div>',
             unsafe_allow_html=True,
         )
-    else:
-        st.info("لا توجد قراءة أخيرة بعد. استخدم زر «فتح التحليل» للبدء.")
-
-    st.markdown('<div class="section">ماذا يفعل التطبيق؟</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="m-card"><div class="m-label">01 • بيانات</div>'
-        '<div class="m-note" style="font-size:12px;color:#dbe6ef">يستقبل بيانات EGX المتاحة ويعرض آخر جلسة مكتملة.</div></div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        '<div class="m-card" style="margin-top:8px"><div class="m-label">02 • تحليل كمي</div>'
-        '<div class="m-note" style="font-size:12px;color:#dbe6ef">SMA وRSI وATR والحجم والدعم والمقاومة والعوائد التاريخية.</div></div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        '<div class="m-card" style="margin-top:8px"><div class="m-label">03 • شرح ذكي</div>'
-        '<div class="m-note" style="font-size:12px;color:#dbe6ef">Gemini يشرح الأرقام والإشارات المتاحة دون اختلاق بيانات أو إصدار أمر تداول.</div></div>',
-        unsafe_allow_html=True,
-    )
 
 
 # -----------------------------
@@ -597,31 +573,35 @@ if page == "⌂  الرئيسية":
 elif page == "◉  السوق":
     st.markdown(
         '<div class="hero"><div class="hero-title">السوق المصري</div>'
-        '<div class="hero-sub">قراءة السوق هنا مبنية على آخر تحليل تم تشغيله فعلياً، بدون أرقام وهمية.</div></div>',
+        '<div class="hero-sub">حالة EGX30 مستقلة عن تحليل سهم بعينه، مع آخر جلسة مكتملة واتجاه متوسطات السوق.</div></div>',
         unsafe_allow_html=True,
     )
-    last = st.session_state.last_analysis
-    if not last:
-        st.info("ابدأ بتحليل سهم من صفحة «البحث والتحليل» لتكوين أول قراءة فعلية.")
+    with st.spinner("جاري قراءة حالة EGX30..."):
+        market = data_engine.get_market_context()
+    if not market.get("success"):
+        st.error(market.get("error", "تعذر قراءة السوق."))
     else:
-        st.markdown('<div class="section">آخر حالة مقاسة</div>', unsafe_allow_html=True)
-        cols = st.columns(4)
-        items = [
-            ("الاتجاه", last["status"]),
-            ("درجة الفرصة", last["opportunity_score"]),
-            ("درجة المخاطر", last["risk_score"]),
-            ("جلسات البيانات", last["history_rows"]),
-        ]
-        for col, (label, value) in zip(cols, items):
-            with col:
-                st.metric(label, value)
-        st.markdown('<div class="section">حركة السعر والمتوسطات</div>', unsafe_allow_html=True)
-        chart = last["chart"].copy()
-        chart["date"] = pd.to_datetime(chart["date"])
-        chart = chart.set_index("date")
-        chart.columns = ["الإغلاق", "SMA 20", "SMA 50", "SMA 200"]
-        st.line_chart(chart, height=380)
-        st.caption("المؤشرات الفنية مفيدة لوصف السلوك التاريخي ولا تضمن نتيجة مستقبلية.")
+        st.markdown(
+            f'<div class="premarket"><div class="premarket-title">حالة السوق</div>'
+            f'<div class="premarket-time">آخر جلسة مكتملة: {market.get("date","—")}</div>'
+            f'<div class="premarket-body">EGX30: <b>{money(market.get("close"))}</b> • '
+            f'SMA20: <b>{money(market.get("sma20"))}</b> • SMA50: <b>{money(market.get("sma50"))}</b> • '
+            f'العائد 20 جلسة: <b>{pct(market.get("return20"))}</b> • '
+            f'النظام: <b>{market.get("regime","—")}</b></div></div>',
+            unsafe_allow_html=True,
+        )
+        last = st.session_state.last_analysis
+        if last:
+            st.markdown('<div class="section">آخر سهم تم تحليله</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="m-card-grid">'
+                f'{app_card("السهم", last.get("symbol","—"), last.get("date","—"))}'
+                f'{app_card("RSI", money(last.get("rsi14")), "14 جلسة")}'
+                f'{app_card("الفرصة", last.get("final_opportunity_score",last.get("opportunity_score","—")), "من 100")}'
+                f'{app_card("المخاطر", last.get("risk_score","—"), "من 100")}'
+                '</div>',
+                unsafe_allow_html=True,
+            )
 
 
 # -----------------------------
@@ -701,28 +681,31 @@ elif page == "✦  الفرص":
 elif page == "☆  المتابعة":
     st.markdown(
         '<div class="hero"><div class="hero-title">قائمة المتابعة</div>'
-        '<div class="hero-sub">قائمة محلية داخل جلسة التطبيق. لا تحتاج قاعدة بيانات لتجربة النسخة الحالية.</div></div>',
+        '<div class="hero-sub">تابع السعر، التغير، RSI، الفرصة والمخاطر لكل سهم أضفته.</div></div>',
         unsafe_allow_html=True,
     )
     if not st.session_state.watchlist:
-        st.info("لا توجد أسهم بعد.")
+        st.info("لا توجد أسهم بعد. أضف سهماً من صفحة التحليل أو الفرص.")
     else:
-        for symbol in list(st.session_state.watchlist):
-            col1, col2, col3 = st.columns([2, 5, 1])
-            with col1:
-                st.markdown(f"### {symbol}")
-            with col2:
-                result = data_engine.get_latest_price(symbol)
-                if result["success"]:
-                    st.write(
-                        f"**{money(result['close'])}**  •  {pct(result['change_pct'])}  •  {result['date']}"
-                    )
-                else:
-                    st.write("تعذر تحديث السعر.")
-            with col3:
-                if st.button("حذف", key=f"remove_{symbol}"):
-                    remove_watchlist(symbol)
-                    st.rerun()
+        for i, symbol in enumerate(list(st.session_state.watchlist)):
+            result = data_engine.get_full_analysis(symbol)
+            if result.get("success"):
+                st.markdown(
+                    '<div class="m-card-grid">'
+                    f'{app_card("السهم", symbol, result.get("date","—"))}'
+                    f'{app_card("السعر", money(result.get("close")), "آخر إغلاق")}'
+                    f'{app_card("التغير", pct(result.get("change_pct")), "الجلسة الأخيرة")}'
+                    f'{app_card("الفرصة", result.get("final_opportunity_score","—"), "من 100")}'
+                    f'{app_card("RSI", money(result.get("rsi14")), "14")}'
+                    f'{app_card("المخاطر", result.get("risk_score","—"), "من 100")}'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.warning(f"{symbol}: {result.get('error','تعذر التحليل')}")
+            if st.button(f"✕ إزالة {symbol}", key=f"watch_remove_{symbol}_{i}", use_container_width=True):
+                remove_watchlist(symbol)
+                st.rerun()
 
 
 # -----------------------------
@@ -731,7 +714,7 @@ elif page == "☆  المتابعة":
 elif page == "▣  المحفظة":
     st.markdown(
         '<div class="hero"><div class="hero-title">المحفظة</div>'
-        '<div class="hero-sub">تتبع المراكز داخل الجلسة الحالية مع حساب القيمة والتغير بناءً على آخر بيانات EOD.</div></div>',
+        '<div class="hero-sub">أدخل مراكزك، وسنحسب القيمة الحالية والربح/الخسارة باستخدام آخر سعر متاح.</div></div>',
         unsafe_allow_html=True,
     )
     with st.form("portfolio_form"):
@@ -742,31 +725,47 @@ elif page == "▣  المحفظة":
             p_qty = st.number_input("الكمية", min_value=0.0, step=1.0)
         with c3:
             p_avg = st.number_input("متوسط التكلفة", min_value=0.0, step=0.01)
-        submitted = st.form_submit_button("إضافة مركز", use_container_width=True)
+        submitted = st.form_submit_button("إضافة / تحديث مركز", use_container_width=True)
         if submitted:
             symbol = data_engine.display_symbol(p_symbol)
             if symbol and p_qty > 0 and p_avg > 0:
-                st.session_state.portfolio.append({"symbol": symbol, "qty": p_qty, "avg": p_avg})
-                st.success("تمت إضافة المركز.")
+                existing = next((x for x in st.session_state.portfolio if x["symbol"] == symbol), None)
+                if existing:
+                    existing["qty"] = p_qty
+                    existing["avg"] = p_avg
+                else:
+                    st.session_state.portfolio.append({"symbol": symbol, "qty": p_qty, "avg": p_avg})
+                st.success("تم حفظ المركز.")
             else:
                 st.warning("أدخل الرمز والكمية ومتوسط التكلفة.")
 
     if st.session_state.portfolio:
         rows = []
-        for pos in st.session_state.portfolio:
+        total_cost = 0.0
+        total_value = 0.0
+        for i, pos in enumerate(st.session_state.portfolio):
             latest = data_engine.get_latest_price(pos["symbol"])
             price = latest.get("close") if latest.get("success") else None
             value = price * pos["qty"] if price is not None else None
             cost = pos["avg"] * pos["qty"]
             pnl = value - cost if value is not None else None
+            total_cost += cost
+            if value is not None:
+                total_value += value
             rows.append({
-                "السهم": pos["symbol"],
-                "الكمية": pos["qty"],
-                "متوسط التكلفة": money(pos["avg"]),
-                "السعر": money(price),
-                "القيمة": money(value),
-                "الربح/الخسارة": money(pnl),
+                "السهم": pos["symbol"], "الكمية": pos["qty"], "متوسط التكلفة": money(pos["avg"]),
+                "السعر": money(price), "القيمة": money(value), "الربح/الخسارة": money(pnl),
             })
+            if st.button(f"✕ إزالة {pos['symbol']}", key=f"portfolio_remove_{pos['symbol']}_{i}", use_container_width=True):
+                st.session_state.portfolio.pop(i)
+                st.rerun()
+        pnl_total = total_value - total_cost if total_value else None
+        st.markdown('<div class="m-card-grid">'
+                    f'{app_card("التكلفة", money(total_cost), "إجمالي التكلفة")}'
+                    f'{app_card("القيمة", money(total_value), "القيمة الحالية")}'
+                    f'{app_card("الربح/الخسارة", money(pnl_total), "غير محقق")}'
+                    f'{app_card("عدد المراكز", len(st.session_state.portfolio), "مركز")}'
+                    '</div>', unsafe_allow_html=True)
         frame = pd.DataFrame(rows)
         st.dataframe(frame, use_container_width=True, hide_index=True)
         st.download_button(
@@ -791,7 +790,7 @@ elif page == "⌕  تحليل":
     )
 
     st.markdown('<div class="search-panel">', unsafe_allow_html=True)
-    query = st.text_input("ابحث عن السهم", placeholder="مثال: SWDY أو EGAL", label_visibility="visible")
+    query = st.text_input("ابحث عن السهم", value=st.session_state.pop("prefill_symbol", ""), placeholder="مثال: SWDY أو EGAL", label_visibility="visible")
     suggestions = data_engine.search_symbols(query) if query else []
     if suggestions:
         st.caption("اقتراحات من قائمة EGX:")
