@@ -2,7 +2,7 @@ name: Daily EGX Telegram
 
 on:
   schedule:
-    - cron: '30 15 * * 0-4'
+    - cron: '0 9 * * 0-4'
       timezone: 'Africa/Cairo'
   workflow_dispatch:
     inputs:
