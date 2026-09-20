@@ -343,7 +343,7 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 .m-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:0 0 15px}
 .m-card{background:linear-gradient(145deg,#0f2135,#0b1726);border:1px solid #213c56;border-radius:17px;padding:14px 13px;min-height:94px;box-shadow:0 8px 22px rgba(0,0,0,.18)}
 .m-label{font-size:10px;color:#8095aa;font-weight:800}
-.m-value{font-size:20px;color:#f7fbff;font-weight:900;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-value{font-size:20px;color:#f7fbff;font-weight:900;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.m-value.up,.price-change.up{color:var(--green)!important}.m-value.down,.price-change.down{color:var(--red)!important}.price-change.flat{color:#91a4b9!important;font-size:11px}.m-value.flat{color:#f7fbff}
 .m-note{font-size:9px;color:#60778d;margin-top:4px;line-height:1.6}
 .action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:15px}
 .action-card{display:flex;align-items:center;gap:10px;background:#0d1b2c;border:1px solid #203750;border-radius:17px;padding:13px;min-height:67px}
@@ -465,12 +465,34 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 # -----------------------------
 # Mobile app shell helpers
 # -----------------------------
-def app_card(label, value, note=""):
+def value_class(value):
+    try:
+        n = float(value)
+        return "up" if n > 0 else ("down" if n < 0 else "flat")
+    except (TypeError, ValueError):
+        return "flat"
+
+def app_card(label, value, note="", tone="flat"):
     return (
         f'<div class="m-card"><div class="m-label">{label}</div>'
-        f'<div class="m-value">{value}</div>'
+        f'<div class="m-value {tone}">{value}</div>'
         f'<div class="m-note">{note}</div></div>'
     )
+
+def price_card(label, price, change=None, note=""):
+    tone = value_class(change)
+    change_text = f" • {pct(change)}" if change is not None else ""
+    return (
+        f'<div class="m-card"><div class="m-label">{label}</div>'
+        f'<div class="m-value">{money(price)} <span class="price-change {tone}">{change_text}</span></div>'
+        f'<div class="m-note">{note}</div></div>'
+    )
+
+def friendly_error(message):
+    text = str(message or "")
+    if "404" in text or "Trigger Not Found" in text:
+        return "تعذر جلب بيانات السوق الآن. جرّب تحديث الصفحة بعد قليل؛ المشكلة من مصدر البيانات وليست من تصميم التطبيق."
+    return text
 
 def app_action(icon, title, subtitle):
     return (
@@ -558,7 +580,7 @@ if page == "⌂  الرئيسية":
         else:
             st.info("لا توجد حالياً فرصة تستوفي شروط الفحص؛ التطبيق لا يعرض فرصة مصطنعة.")
     else:
-        st.error(premarket.get("error", "تعذر تجهيز تقرير ما قبل الافتتاح."))
+        st.error(friendly_error(premarket.get("error", "تعذر تجهيز تقرير ما قبل الافتتاح.")))
 
     last = st.session_state.last_analysis
     cards = [
@@ -739,7 +761,7 @@ elif page == "☆  المتابعة":
                     unsafe_allow_html=True,
                 )
             else:
-                st.warning(f"{symbol}: {result.get('error','تعذر التحليل')}")
+                st.warning(f"{symbol}: {friendly_error(result.get('error','تعذر التحليل'))}")
             if st.button(f"✕ إزالة {symbol}", key=f"watch_remove_{symbol}_{i}", use_container_width=True):
                 remove_watchlist(symbol)
                 st.rerun()
@@ -854,7 +876,7 @@ elif page == "⌕  تحليل":
             with st.spinner("جاري جلب البيانات وتحليل آخر 365 جلسة..."):
                 result = data_engine.get_full_analysis(selected_symbol)
             if not result["success"]:
-                st.error(result["error"])
+                st.error(friendly_error(result["error"]))
             else:
                 st.session_state.last_analysis = result
                 st.session_state.last_ai = None
@@ -873,8 +895,8 @@ elif page == "⌕  تحليل":
 
                 st.markdown(
                     '<div class="m-card-grid">'
-                    f'{app_card("آخر إغلاق", money(result["close"]), "السعر")}'
-                    f'{app_card("التغير", pct(result["change_pct"]), "الجلسة الأخيرة")}'
+                    f'{price_card("السعر الحالي", result["close"], result.get("change_pct"), "آخر سعر/إغلاق متاح")}'
+                    f'{app_card("نسبة التغير", pct(result["change_pct"]), "الجلسة الأخيرة", value_class(result.get("change_pct")))}'
                     f'{app_card("أعلى سعر", money(result["high"]), "الجلسة")}'
                     f'{app_card("أقل سعر", money(result["low"]), "الجلسة")}'
                     '</div>',
@@ -887,10 +909,9 @@ elif page == "⌕  تحليل":
                     f'<div class="premarket-title">{result.get("setup","لا توجد إشارة كافية")}</div>'
                     f'<div class="premarket-body">درجة الفرصة <b>{result.get("final_opportunity_score","—")}/100</b> • '
                     f'الارتداد <b>{result.get("rebound_score","—")}/100</b> • المخاطر <b>{result.get("risk_score","—")}/100</b><br>'
-                    f'مرجع السعر: <b>{money(result.get("entry_reference"))}</b> • '
-                    f'هدف 1: <b>{money(result.get("target1"))}</b> • هدف 2: <b>{money(result.get("target2"))}</b><br>'
-                    f'إلغاء السيناريو: <b>{money(result.get("invalidation"))}</b> • '
-                    f'وقف حسابي: <b>{money(result.get("stop"))}</b> • '
+                    f'السعر الحالي: <b>{money(result.get("close"))}</b> • مرجع الدخول: <b>{money(result.get("entry_reference"))}</b><br>'
+                    f'المستهدف 1: <b>{money(result.get("target1"))}</b> • المستهدف 2: <b>{money(result.get("target2"))}</b><br>'
+                    f'وقف الخسارة: <b>{money(result.get("stop"))}</b> • إلغاء السيناريو: <b>{money(result.get("invalidation"))}</b> • '
                     f'R:R: <b>{money(result.get("risk_reward"))}</b></div>'
                     '</div>', unsafe_allow_html=True,
                 )
