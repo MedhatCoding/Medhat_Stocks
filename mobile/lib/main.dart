@@ -24,6 +24,7 @@ class _ShellState extends State<Shell>{
     ListTile(leading:const Icon(Icons.search),title:const Text('تحليل سهم'),onTap:(){Navigator.pop(c);setState(()=>i=2);}),
     ListTile(leading:const Icon(Icons.star),title:const Text('المتابعة'),onTap:(){Navigator.pop(c);setState(()=>i=3);}),
     ListTile(leading:const Icon(Icons.account_balance_wallet),title:const Text('المحفظة'),onTap:(){Navigator.pop(c);setState(()=>i=4);}),
+    ListTile(leading:const Icon(Icons.settings_outlined),title:const Text('الإعدادات'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>SettingsPage(onTheme:widget.onTheme)));}),
     SwitchListTile.adaptive(value:Theme.of(c).brightness==Brightness.dark,onChanged:widget.onTheme,title:const Text('الوضع الداكن'),secondary:const Icon(Icons.dark_mode_outlined)),
    ]))),
    body:SafeArea(child:IndexedStack(index:i,children:pages)),
@@ -45,7 +46,12 @@ class Opportunity extends StatelessWidget{final Map<String,dynamic>x;const Oppor
 class Search extends StatefulWidget{const Search({super.key});@override State<Search>createState()=>_SState();}
 class _SState extends State<Search>{final q=TextEditingController();List<dynamic>r=[];Future<void>s()async{try{final x=await Api.get('/stocks/search?q='+Uri.encodeQueryComponent(q.text));if(mounted)setState(()=>r=x['data']??[]);}catch(_){}}@override Widget build(BuildContext c)=>ListView(padding:const EdgeInsets.all(18),children:[const Text('تحليل سهم',style:TextStyle(fontSize:29,fontWeight:FontWeight.w900)),TextField(controller:q,onSubmitted:(_)=>s(),decoration:const InputDecoration(hintText:'رمز أو اسم الشركة',prefixIcon:Icon(Icons.search))),const SizedBox(height:10),FilledButton(onPressed:s,child:const Text('بحث')),...r.map((x)=>ListTile(title:Text(x['symbol'].toString()),subtitle:Text(x['name']?.toString()??''),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Details(symbol:x['symbol'].toString(),name:x['name']?.toString()??'')))))]);}
 class Details extends StatefulWidget{final String symbol,name;const Details({super.key,required this.symbol,required this.name});@override State<Details>createState()=>_DState();}
-class _DState extends State<Details>{Map<String,dynamic>?d;String?ai;bool busy=false;@override void initState(){super.initState();load();}Future<void>load()async{try{final x=await Api.get('/stocks/'+widget.symbol+'/full-analysis');if(mounted)setState(()=>d=x);}catch(_){}}Future<void>watch()async{final p=await SharedPreferences.getInstance();final a=p.getStringList('watchlist')??[];if(!a.contains(widget.symbol))a.add(widget.symbol);await p.setStringList('watchlist',a);if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تمت الإضافة للمتابعة')));}Future<void>run()async{setState(()=>busy=true);try{final x=await Api.post('/stocks/'+widget.symbol+'/ai-analysis');if(mounted)setState(()=>ai=x['text']?.toString());}catch(e){if(mounted)setState(()=>ai='تعذر تشغيل AI: '+e.toString());}finally{if(mounted)setState(()=>busy=false);}}@override Widget build(BuildContext c){if(d==null)return const Scaffold(body:Center(child:CircularProgressIndicator()));return Scaffold(appBar:AppBar(title:Text(widget.symbol)),body:RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(18),children:[Text(widget.name),Text(fmt(d!['close']),style:const TextStyle(fontSize:38,fontWeight:FontWeight.w900)),Text(fmt(d!['change_pct'])+'%',style:TextStyle(color:(numVal(d!['change_pct'])??0)>=0?Colors.green:Colors.red)),const SizedBox(height:8),FilledButton.icon(onPressed:watch,icon:const Icon(Icons.star_outline),label:const Text('إضافة لقائمة المتابعة')),Info('مؤشر الشريعة',Text(d!['sharia_compliant']==true?'متوافق مع المرجع الشرعي':'غير موجود في المرجع الشرعي؛ لا يدخل الفرص')),Info('خلاصة الفرصة',Column(children:[Row(children:[Stat('الفرصة',d!['final_opportunity_score']),Stat('الارتداد',d!['rebound_score']),Stat('المخاطر',d!['risk_score'])]),Text('السوق: '+(d!['market_regime']??'—').toString()+' • الأخبار: '+fmt(d!['news_score']))])),Info('المستويات',Wrap(spacing:16,runSpacing:12,children:[Stat('دعم',d!['support']),Stat('مقاومة',d!['resistance']),Stat('هدف1',d!['target1']),Stat('هدف2',d!['target2']),Stat('إيقاف',d!['stop']),Stat('R/R',d!['risk_reward'])])),Info('التحليل الفني',Column(children:[_row('RSI',d!['rsi14']),_row('SMA20',d!['sma20']),_row('SMA50',d!['sma50']),_row('SMA200',d!['sma200']),_row('ATR',d!['atr14']),_row('العائد20',d!['return20']),_row('التذبذب',d!['volatility20'])])),Info('الأساسيات',Column(children:[_row('القطاع',d!['fundamentals']?['sector']),_row('P/E',d!['fundamentals']?['pe']),_row('EPS',d!['fundamentals']?['eps'])])),Info('الأخبار',Column(children:[...(d!['news'] as List? ?? []).take(5).map((n)=>ListTile(contentPadding:EdgeInsets.zero,title:Text(n['title']?.toString()??'',maxLines:2,overflow:TextOverflow.ellipsis),subtitle:Text((n['date']??'').toString()+' • '+fmt(n['polarity']))))])),Info('AI',Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[if(ai!=null)Text(ai!),if(ai==null)const Text('شرح AI عند الطلب دون اختلاق أرقام أو إصدار أمر شراء/بيع.'),FilledButton(onPressed:busy?null:run,child:Text(busy?'جاري التحليل…':'تشغيل AI'))]))])));}
+class _DState extends State<Details>{Map<String,dynamic>?d;String?ai;bool busy=false;@override void initState(){super.initState();load();}Future<void>load()async{try{final x=await Api.get('/stocks/'+widget.symbol+'/full-analysis');if(mounted)setState(()=>d=x);}catch(_){}}Future<void>watch()async{final p=await SharedPreferences.getInstance();final a=p.getStringList('watchlist')??[];if(!a.contains(widget.symbol))a.add(widget.symbol);await p.setStringList('watchlist',a);if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تمت الإضافة للمتابعة')));}Future<void>run()async{setState(()=>busy=true);try{final x=await Api.post('/stocks/'+widget.symbol+'/ai-analysis');if(mounted)setState(()=>ai=x['text']?.toString());}catch(e){if(mounted)setState(()=>ai='تعذر تشغيل AI: '+e.toString());}finally{if(mounted)setState(()=>busy=false);}}@override Widget build(BuildContext c){if(d==null)return const Scaffold(body:Center(child:CircularProgressIndicator()));return Scaffold(appBar:AppBar(title:Text(widget.symbol)),body:RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(18),children:[Text(widget.name),Text(fmt(d!['close']),style:const TextStyle(fontSize:38,fontWeight:FontWeight.w900)),Text(fmt(d!['change_pct'])+'%',style:TextStyle(color:(numVal(d!['change_pct'])??0)>=0?Colors.green:Colors.red)),const SizedBox(height:8),FilledButton.icon(onPressed:watch,icon:const Icon(Icons.star_outline),label:const Text('إضافة لقائمة المتابعة')),Info('مؤشر الشريعة',Text(d!['sharia_compliant']==true?'متوافق مع المرجع الشرعي':'غير موجود في المرجع الشرعي؛ لا يدخل الفرص')),Info('خلاصة الفرصة',Column(children:[Row(children:[Stat('الفرصة',d!['final_opportunity_score']),Stat('الارتداد',d!['rebound_score']),Stat('المخاطر',d!['risk_score'])]),Text('السوق: '+(d!['market_regime']??'—').toString()+' • الأخبار: '+fmt(d!['news_score']))])),Info('المستويات',Wrap(spacing:16,runSpacing:12,children:[Stat('دعم',d!['support']),Stat('مقاومة',d!['resistance']),Stat('هدف1',d!['target1']),Stat('هدف2',d!['target2']),Stat('إيقاف',d!['stop']),Stat('R/R',d!['risk_reward'])])),
+Info('الشارت',StockChart(points:((d!['chart'] as List?)??[]).map((e)=>numVal(e['close'])).whereType<double>().toList())),
+Card(child:ExpansionTile(title:const Text('التفاصيل الفنية',style:TextStyle(fontWeight:FontWeight.w900)),children:[_row('RSI',d!['rsi14']),_row('SMA20',d!['sma20']),_row('SMA50',d!['sma50']),_row('SMA200',d!['sma200']),_row('ATR',d!['atr14']),_row('العائد20',d!['return20']),_row('العائد60',d!['return60']),_row('التذبذب',d!['volatility20']),_row('نسبة الحجم',d!['volume_ratio'])])),
+Info('الأساسيات',Column(children:[_row('القطاع',d!['fundamentals']?['sector']),_row('P/E',d!['fundamentals']?['pe']),_row('EPS',d!['fundamentals']?['eps'])])),
+Card(child:ExpansionTile(title:const Text('الأخبار',style:TextStyle(fontWeight:FontWeight.w900)),children:[...(d!['news'] as List? ?? []).take(6).map((n)=>ListTile(contentPadding:const EdgeInsets.symmetric(horizontal:16),title:Text(n['title']?.toString()??'',maxLines:2,overflow:TextOverflow.ellipsis),subtitle:Text((n['date']??'').toString()+' • '+fmt(n['polarity']))))])),
+Info('AI',Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[if(ai!=null)Text(ai!),if(ai==null)const Text('شرح AI عند الطلب دون اختلاق أرقام أو إصدار أمر شراء/بيع.'),FilledButton(onPressed:busy?null:run,child:Text(busy?'جاري التحليل…':'تشغيل AI'))]))])));}
 }
 Widget _row(String a,d)=>ListTile(contentPadding:EdgeInsets.zero,title:Text(a),trailing:Text(fmt(d),style:const TextStyle(fontWeight:FontWeight.w800)));
 class Watchlist extends StatefulWidget{const Watchlist({super.key});@override State<Watchlist>createState()=>_WState();}
@@ -58,3 +64,45 @@ class Stat extends StatelessWidget{final String t;final dynamic v;const Stat(thi
 class Act extends StatelessWidget{final String t;final IconData i;final VoidCallback f;const Act(this.t,this.i,this.f,{super.key});@override Widget build(BuildContext c)=>Card(child:InkWell(onTap:f,child:Padding(padding:const EdgeInsets.all(18),child:Row(children:[Icon(i,color:Theme.of(c).colorScheme.primary),const SizedBox(width:8),Text(t,style:const TextStyle(fontWeight:FontWeight.w800))]))));}
 num?numVal(dynamic v)=>v is num?v.toDouble():double.tryParse(v?.toString()??'');
 String fmt(dynamic v){final n=numVal(v);return n==null?'—':n.abs()>=1000?n.toStringAsFixed(0):n.toStringAsFixed(2);}
+
+class StockChart extends StatelessWidget{
+ final List<double> points;
+ const StockChart({super.key,required this.points});
+ @override Widget build(BuildContext c){
+  if(points.length<2)return const SizedBox(height:120,child:Center(child:Text('لا توجد بيانات كافية للشارت')));
+  return SizedBox(height:220,child:CustomPaint(painter:_ChartPainter(points,Theme.of(c).colorScheme.primary),child:const SizedBox.expand()));
+ }
+}
+class _ChartPainter extends CustomPainter{
+ final List<double> p; final Color color;
+ _ChartPainter(this.p,this.color);
+ @override void paint(Canvas canvas,Size size){
+  final minV=p.reduce((a,b)=>a<b?a:b), maxV=p.reduce((a,b)=>a>b?a:b);
+  final range=(maxV-minV).abs()<0.000001?1:(maxV-minV);
+  final paint=Paint()..color=color..strokeWidth=3..style=PaintingStyle.stroke..strokeCap=StrokeCap.round;
+  final path=Path();
+  for(var i=0;i<p.length;i++){
+   final x=size.width*(i/(p.length-1));
+   final y=size.height-((p[i]-minV)/range)*(size.height-18)-9;
+   if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
+  }
+  canvas.drawPath(path,paint);
+ }
+ @override bool shouldRepaint(covariant _ChartPainter old)=>old.p!=p||old.color!=color;
+}
+class SettingsPage extends StatefulWidget{
+ final Future<void>Function(bool)onTheme;
+ const SettingsPage({super.key,required this.onTheme});
+ @override State<SettingsPage>createState()=>_SettingsPageState();
+}
+class _SettingsPageState extends State<SettingsPage>{
+ Map<String,dynamic>?h;
+ @override void initState(){super.initState();load();}
+ Future<void>load()async{try{final x=await Api.get('/health');if(mounted)setState(()=>h=Map<String,dynamic>.from(x));}catch(_){if(mounted)setState(()=>h={'error':'تعذر الاتصال بالواجهة الخلفية'});}}
+ @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('الإعدادات')),body:ListView(padding:const EdgeInsets.all(18),children:[
+  Card(child:SwitchListTile.adaptive(value:Theme.of(c).brightness==Brightness.dark,onChanged:widget.onTheme,title:const Text('الوضع الداكن'),secondary:const Icon(Icons.dark_mode_outlined))),
+  Info('حالة البيانات',Column(children:[_row('EODHD',h?['eodhd_configured']==true?'متصل':'غير مهيأ'),_row('OANOR',h?['oanor_configured']==true?'متصل':'غير مهيأ'),_row('Gemini',h?['gemini_configured']==true?'متصل':'غير مهيأ')])),
+  const Info('المرجعية الشرعية',Text('قائمة مرجعية مؤرخة وليست حكماً شرعياً دائماً. الفرص تُفلتر عليها فقط.')),
+  const Info('التوقيت',Text('Africa/Cairo — يتعامل تلقائياً مع التوقيت الصيفي والشتوي.')),
+ ]));
+}
