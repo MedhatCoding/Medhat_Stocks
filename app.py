@@ -1,4 +1,5 @@
 import streamlit as st
+from data_engine import data_engine
 
 st.set_page_config(
     page_title="مدحت ستوكس AI",
@@ -9,6 +10,22 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+.main .block-container {
+    direction: rtl;
+    text-align: right;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1400px;
+}
+
+[data-testid="stSidebar"] {
+    direction: rtl;
+}
+
+[data-testid="stSidebar"] * {
+    text-align: right;
+}
+
 .main-title {
     font-size: 34px;
     font-weight: 700;
@@ -36,26 +53,6 @@ st.markdown("""
 .muted {
     color: #888;
     font-size: 13px;
-}
-
-/* محتوى التطبيق بالعربي */
-.main .block-container {
-    direction: rtl;
-    text-align: right;
-}
-
-/* القائمة الجانبية */
-[data-testid="stSidebar"] {
-    direction: rtl;
-}
-
-[data-testid="stSidebar"] * {
-    text-align: right;
-}
-
-/* نخلي أزرار الاختيار واضحة */
-[data-testid="stSidebar"] [role="radiogroup"] {
-    direction: rtl;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -85,7 +82,6 @@ with st.sidebar:
     )
 
     st.divider()
-
     st.caption("التحليل بالذكاء الاصطناعي يعمل في الخلفية.")
     st.caption("الإصدار 1.0")
 
@@ -142,50 +138,15 @@ if page == "لوحة التحكم":
         <div class="card">
             <div class="muted">سلامة البيانات</div>
             <div class="score">—</div>
-            <div class="muted">لم يتم الاتصال بعد</div>
+            <div class="muted">لم يتم الفحص</div>
         </div>
         """, unsafe_allow_html=True)
 
     st.subheader("تحليل اليوم")
 
     st.info(
-        "محرك التحليل لم يتم ربطه بالبيانات الحقيقية بعد. "
-        "سيتم لاحقًا ربط بيانات السوق والتحليل الفني والأساسي "
-        "والأخبار والذكاء الاصطناعي وإدارة المخاطر."
-    )
-
-    st.subheader("محرك القرارات")
-
-    a, b, c, d, e = st.columns(5)
-
-    with a:
-        st.metric("فرصة دخول", "—")
-
-    with b:
-        st.metric("تشبع بيعي", "—")
-
-    with c:
-        st.metric("قائمة متابعة", "—")
-
-    with d:
-        st.metric("لا توجد صفقة", "—")
-
-    with e:
-        st.metric("مرفوض", "—")
-
-    st.subheader("أهم الفرص")
-
-    st.dataframe(
-        {
-            "السهم": [],
-            "الشركة": [],
-            "القطاع": [],
-            "درجة الفرصة": [],
-            "القرار": [],
-            "المخاطر": [],
-        },
-        use_container_width=True,
-        hide_index=True,
+        "بعد تشغيل محرك البيانات سيتم هنا عرض حالة السوق "
+        "والفرص التي اجتازت شروط التحليل."
     )
 
 
@@ -197,7 +158,9 @@ elif page == "السوق":
 
     st.title("السوق")
 
-    st.info("ستظهر بيانات السوق هنا بعد ربط محرك بيانات البورصة المصرية.")
+    st.info(
+        "بيانات السوق الحية سيتم عرضها هنا بعد اكتمال محرك السوق."
+    )
 
     a, b, c = st.columns(3)
 
@@ -220,17 +183,15 @@ elif page == "الفرص":
     st.title("الفرص")
 
     st.info(
-        "سيتم عرض الأسهم التي تجتاز محرك التحليل "
-        "بعد فحص السعر والسيولة والأساسيات والأخبار والمخاطر."
+        "ستظهر هنا الأسهم التي تجتاز محرك التحليل الكامل."
     )
 
     st.dataframe(
         {
             "السهم": [],
             "الشركة": [],
-            "الدرجة": [],
+            "درجة الفرصة": [],
             "القرار": [],
-            "لماذا الآن؟": [],
             "المخاطر": [],
         },
         use_container_width=True,
@@ -255,70 +216,8 @@ elif page == "قائمة المتابعة":
 elif page == "المحفظة":
 
     st.title("المحفظة")
-    st.info("سيتم ربط متابعة المحفظة بعد الانتهاء من محرك التحليل الأساسي.")
+    st.info("متابعة المحفظة سيتم تفعيلها في مرحلة لاحقة.")
 
 
 # =========================
-# البحث والتحليل
-# =========================
-
-elif page == "البحث والتحليل":
-
-    st.title("البحث والتحليل")
-
-    st.markdown("""
-    ### وضع البحث
-
-    ابحث عن سهم مصري لتحليله.
-
-    سيجمع المحرك بين:
-
-    - بيانات السوق
-    - التحليل الفني
-    - التحليل الأساسي
-    - السيولة
-    - القوة النسبية
-    - الأخبار
-    - تحليل Gemini
-    - إدارة المخاطر
-    - إشارات التأكيد
-    """)
-
-    symbol = st.text_input(
-        "رمز السهم",
-        placeholder="مثال: COMI",
-    )
-
-    if st.button("تحليل السهم"):
-        if symbol.strip():
-            st.info(
-                f"تم إنشاء طلب تحليل للسهم **{symbol.upper()}**."
-            )
-        else:
-            st.warning("اكتب رمز السهم أولًا.")
-
-
-# =========================
-# الإعدادات
-# =========================
-
-elif page == "الإعدادات":
-
-    st.title("الإعدادات")
-
-    st.subheader("التحليل")
-
-    st.checkbox("إظهار المؤشرات الفنية", value=False)
-    st.checkbox("إظهار تفاصيل تحليل الذكاء الاصطناعي", value=False)
-    st.checkbox("تفعيل التقرير اليومي على Telegram", value=True)
-
-    st.divider()
-
-    st.subheader("النظام")
-
-    st.write("مصدر البيانات: لم يتم الاتصال")
-    st.write("الذكاء الاصطناعي: Gemini")
-    st.write("قاعدة البيانات: لم يتم الاتصال")
-    st.write("Telegram: لم يتم الاتصال")
-
-    st.success("واجهة التطبيق جاهزة.")
+# البحث
