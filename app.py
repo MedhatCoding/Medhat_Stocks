@@ -828,12 +828,3 @@ elif page == "⚙  الإعدادات":
         "checked_at": health["checked_at"],
     })
 
-<style>
-@media(min-width:701px){
- div[data-testid="stRadio"]{margin:0 0 14px!important}
- div[data-testid="stRadio"]>label{display:none!important}
- div[data-testid="stRadio"] [role="radiogroup"]{display:flex!important;gap:6px!important;direction:rtl!important}
- div[data-testid="stRadio"] [role="radio"]{padding:8px 12px!important;border-radius:12px!important;background:#0d1b2c!important;border:1px solid #203750!important;color:#91a4b9!important;font-size:11px!important;font-weight:800!important}
- div[data-testid="stRadio"] [role="radio"][aria-checked="true"]{background:#102b21!important;color:#83f2b5!important;border-color:#24583f!important}
- div[data-testid="stRadio"] [role="radio"]>div:first-child{display:none!important}
-</style>
