@@ -571,6 +571,31 @@ class DataEngine:
         rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
         return {"success": True, "data": rows[:max(1, min(int(limit), 40))], "count": len(rows), "market": market, "sharia_universe_count": len(SHARIA_SYMBOLS)}
 
+
+    def get_premarket_report(self, limit=5):
+        """Build the daily pre-market decision screen using the latest completed EGX session."""
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("Africa/Cairo"))
+        trading_day = now.weekday() in (6, 0, 1, 2, 3)
+        market = self.get_market_context()
+        if not market.get("success"):
+            return {"success": False, "error": market.get("error", "تعذر قراءة حالة السوق")}
+        opportunities = self.get_opportunities(limit=max(5, min(int(limit), 20)))
+        if not opportunities.get("success"):
+            return {"success": False, "error": opportunities.get("error", "تعذر فحص الفرص")}
+        latest_session_date = market.get("date")
+        return {
+            "success": True,
+            "date": now.strftime("%Y-%m-%d"),
+            "time": now.strftime("%H:%M"),
+            "trading_day": trading_day,
+            "before_open": now.hour < 10,
+            "market": market,
+            "opportunities": opportunities.get("data", [])[:max(1, min(int(limit), 20))],
+            "latest_session_date": latest_session_date,
+            "sharia_universe_count": opportunities.get("sharia_universe_count", len(SHARIA_SYMBOLS)),
+        }
+
     def get_full_analysis(self, symbol):
         technical = self.analyze_stock(symbol)
         if not technical.get("success"): return technical
