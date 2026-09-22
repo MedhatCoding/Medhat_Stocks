@@ -21,7 +21,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Compile Python files
-        run: python -m py_compile app.py data_engine.py config.py sharia_universe.py
+        run: python -m py_compile app.py data_engine.py config.py sharia_universe.py ml_engine.py recommendation_journal.py
 
       - name: Start Streamlit
         run: |
