@@ -809,15 +809,23 @@ class DataEngine:
         risk = float(analysis.get("risk_score") or 0)
         market_adj = 8 if market and market.get("regime") == "إيجابي" else (-10 if market and market.get("regime") == "ضعيف" else 0)
         news_adj = max(-8, min(8, news_score * 8)) if news_score is not None else 0
-        ml_probability = analysis.get("ml", {}).get("probability") if isinstance(analysis.get("ml"), dict) and analysis.get("ml", {}).get("success") else None
+        ml_data = analysis.get("ml", {}) if isinstance(analysis.get("ml"), dict) else {}
+        ml_probability = ml_data.get("probability") if ml_data.get("success") else None
         ml_adj = ((float(ml_probability) - 50.0) * 0.12) if ml_probability is not None else 0
         final_score = max(0, min(100, round(trend * 0.35 + rebound * 0.45 + (100-risk) * 0.20 + market_adj + news_adj + ml_adj)))
+        validation = ml_data.get("validation_accuracy")
+        confidence_parts = [min(100, max(0, float(final_score)))]
+        if validation is not None:
+            confidence_parts.append(float(validation))
+        if ml_probability is not None:
+            confidence_parts.append(100 - abs(float(ml_probability) - 50) * 1.4)
+        confidence_score = round(sum(confidence_parts) / len(confidence_parts))
         setup = "ارتداد محتمل" if rebound >= 55 else ("تحت المراقبة" if rebound >= 35 else "لا توجد إشارة ارتداد كافية")
         target1 = close + atr if close is not None and atr else None
         target2 = close + (2 * atr) if close is not None and atr else None
         stop = close - (1.2 * atr) if close is not None and atr else None
         rr = ((target1-close)/(close-stop)) if target1 is not None and stop is not None and close != stop else None
-        return {"rebound_score": round(rebound), "final_opportunity_score": final_score, "setup": setup, "entry_reference": close, "target1": target1, "target2": target2, "stop": stop, "invalidation": support * 0.98 if support else None, "risk_reward": rr, "market_regime": (market or {}).get("regime", "غير متاح"), "news_score": news_score, "ml_probability": ml_probability}
+        return {"rebound_score": round(rebound), "final_opportunity_score": final_score, "setup": setup, "entry_reference": close, "target1": target1, "target2": target2, "stop": stop, "invalidation": support * 0.98 if support else None, "risk_reward": rr, "confidence_score": confidence_score, "ml_validation_accuracy": validation, "market_regime": (market or {}).get("regime", "غير متاح"), "news_score": news_score, "ml_probability": ml_probability}
 
     @st.cache_data(ttl=900, show_spinner=False)
     def get_opportunities(_self, limit=20):
