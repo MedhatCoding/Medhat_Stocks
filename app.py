@@ -75,6 +75,8 @@ if "last_fundamentals" not in st.session_state:
     st.session_state.last_fundamentals = None
 if "mobile_page" not in st.session_state:
     st.session_state.mobile_page = "⌂  الرئيسية"
+if "analysis_nav_symbol" not in st.session_state:
+    st.session_state.analysis_nav_symbol = None
 if "jump_page" not in st.session_state:
     st.session_state.jump_page = None
 if st.session_state.jump_page:
@@ -728,8 +730,7 @@ elif page == "✦  الفرص":
             a1, a2 = st.columns(2)
             with a1:
                 if st.button("🔎 تحليل السهم", key=f"opp_analyze_{symbol}_{i}", use_container_width=True, type="primary"):
-                    st.session_state.prefill_symbol = symbol
-                    st.session_state.analysis_query = symbol
+                    st.session_state.analysis_nav_symbol = symbol
                     st.session_state.analysis_autorun = True
                     st.session_state.mobile_page = "⌕  تحليل"
                     st.rerun()
@@ -738,6 +739,31 @@ elif page == "✦  الفرص":
                     add_watchlist(symbol)
                     st.success(f"تمت إضافة {data_engine.arabic_company_name(symbol, symbol)} لقائمة المتابعة.")
             st.markdown("---")
+
+        ml_rows = [x for x in opportunities.get("data", []) if x.get("ml_probability") is not None]
+        if ml_rows:
+            avg_ml = sum(float(x["ml_probability"]) for x in ml_rows) / len(ml_rows)
+            st.markdown(
+                f'<div class="premarket"><div class="premarket-title">🧠 التعلم الآلي</div>'
+                f'<div class="premarket-body">النموذج يتعلم من السلوك التاريخي لكل سهم ويؤثر تدريجيًا في درجة الفرصة. '
+                f'متوسط الاحتمال التاريخي في المرشحين الحاليين: <b>{avg_ml:.1f}%</b>.</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        if st.button("📨 إرسال فرص اليوم إلى Telegram", use_container_width=True):
+            lines = ["📊 <b>مدحت ستوكس AI — فرص اليوم</b>", f"عدد الفرص: {len(opportunities.get('data', []))}"]
+            for row in opportunities.get("data", [])[:10]:
+                name = data_engine.arabic_company_name(row.get("symbol",""), row.get("name",""))
+                ml = row.get("ml_probability")
+                ml_text = f" • ML: {ml:.1f}%" if ml is not None else ""
+                lines.append(
+                    f"\n<b>{name}</b> ({row.get('symbol','—')})\n"
+                    f"السعر: {money(row.get('close'))} • التغير: {pct(row.get('change_pct'))}\n"
+                    f"الفرصة: {row.get('opportunity_score','—')}/100 • المخاطر: {row.get('risk_score','—')}{ml_text}\n"
+                    f"الدخول المرجعي: {money(row.get('entry_reference'))} • الهدف 1: {money(row.get('target1'))} • الإلغاء: {money(row.get('invalidation'))}"
+                )
+            ok, msg = send_telegram("\n".join(lines))
+            st.success(msg) if ok else st.error(msg)
 
         st.markdown('<div class="section">لماذا ظهر هذا السهم؟</div>', unsafe_allow_html=True)
         st.info(
@@ -875,10 +901,11 @@ elif page == "⌕  تحليل":
     )
 
     st.markdown('<div class="search-panel">', unsafe_allow_html=True)
-    if "analysis_query" not in st.session_state:
+    nav_symbol = st.session_state.pop("analysis_nav_symbol", None)
+    if nav_symbol:
+        st.session_state.analysis_query = nav_symbol
+    elif "analysis_query" not in st.session_state:
         st.session_state.analysis_query = st.session_state.get("prefill_symbol", "")
-    elif st.session_state.get("prefill_symbol") and not st.session_state.get("analysis_query"):
-        st.session_state.analysis_query = st.session_state.prefill_symbol
     query = st.text_input("ابحث عن السهم", key="analysis_query", placeholder="مثال: SWDY أو EGAL", label_visibility="visible")
     suggestions = data_engine.search_symbols(query) if query else []
     if suggestions:
@@ -915,7 +942,6 @@ elif page == "⌕  تحليل":
                 st.session_state.last_ai = None
                 # IMPORTANT: analysis_query belongs to st.text_input and must never be
                 # assigned after that widget has been created. Keep navigation state separate.
-                st.session_state.prefill_symbol = result["symbol"].replace(".EGX", "")
                 symbol = result["symbol"].replace(".EGX", "")
                 sharia_ok = sharia_status(symbol)
 
@@ -951,6 +977,17 @@ elif page == "⌕  تحليل":
                     f'R:R: <b>{money(result.get("risk_reward"))}</b></div>'
                     '</div>', unsafe_allow_html=True,
                 )
+
+                ml = result.get("ml", {})
+                if ml.get("success"):
+                    st.markdown(
+                        '<div class="section">🧠 التعلم الآلي</div>'
+                        f'<div class="premarket"><div class="premarket-title">احتمال تاريخي محسوب بالنموذج</div>'
+                        f'<div class="premarket-body">احتمال تحقق سيناريو +{ml.get("target_pct",3)}% خلال {ml.get("horizon_days",10)} جلسات قبل وقف {ml.get("stop_pct",4)}%: '
+                        f'<b>{ml.get("probability","—")}%</b><br>'
+                        f'عينات التدريب: <b>{ml.get("samples","—")}</b> • دقة اختبار تاريخي: <b>{ml.get("validation_accuracy","—")}%</b></div></div>',
+                        unsafe_allow_html=True,
+                    )
 
                 st.markdown('<div class="section">الأخبار</div>', unsafe_allow_html=True)
                 news_rows = result.get("news", [])
