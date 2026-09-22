@@ -586,7 +586,7 @@ if page == "⌂  الرئيسية":
                 if st.button(f'🔎 تحليل السهم', key=f'home_analyze_{row.get("symbol","")}', use_container_width=True, type="primary"):
                     st.session_state.mobile_page = "⌕  تحليل"
                     st.session_state.prefill_symbol = row.get("symbol","")
-                    st.session_state.analysis_query = row.get("symbol","")
+                    st.session_state.analysis_nav_symbol = row.get("symbol","")
                     st.session_state.analysis_autorun = True
                     st.rerun()
         else:
@@ -723,6 +723,15 @@ elif page == "✦  الفرص":
                 st.metric("هدف 1 ATR", money(row.get("target1")))
             with c3:
                 st.metric("إلغاء السيناريو", money(row.get("invalidation")))
+            st.markdown(
+                f'<div class="m-card-grid">'
+                f'{app_card("الدخول", money(row.get("entry_reference")), "مرجع")}'
+                f'{app_card("هدف 1", money(row.get("target1")), "ATR")}'
+                f'{app_card("هدف 2", money(row.get("target2")), "ATR")}'
+                f'{app_card("وقف الخسارة", money(row.get("stop")), "حماية")}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
             st.caption(
                 f"رمز التداول: {symbol} • RSI {money(row.get('rsi14'))} • تغير 20 جلسة {pct(row.get('return20'))} • "
                 f"نسبة الحجم {money(row.get('volume_ratio'))} • الأخبار {money(row.get('news_score'))}"
@@ -1095,6 +1104,33 @@ elif page == "⌕  تحليل":
 # -----------------------------
 # Settings
 # -----------------------------
+elif page == "⚙  الإعدادات":
+    st.markdown(
+        '<div class="hero"><div class="hero-title">الإعدادات وقياس الأداء</div>'
+        '<div class="hero-sub">سجل داخلي للتوصيات ونتائجها، مع مؤشرات أداء تاريخية للمعايرة فقط.</div></div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        from recommendation_journal import summary, evaluate_open, backtest
+        evaluate_open(data_engine.get_stock_history, horizon=10)
+        s = summary()
+        c1,c2,c3,c4 = st.columns(4)
+        c1.metric("إجمالي الإشارات", s["total"])
+        c2.metric("المغلقة", s["closed"])
+        c3.metric("نسبة النجاح", f'{s["win_rate"]}%' if s["win_rate"] is not None else "—")
+        c4.metric("متوسط العائد", f'{s["avg_return"]}%' if s["avg_return"] is not None else "—")
+        st.caption(f'المفتوحة: {s["open"]} • Profit Factor: {s["profit_factor"] if s["profit_factor"] is not None else "—"}')
+        if st.button("📊 تشغيل Backtest", use_container_width=True):
+            with st.spinner("جاري اختبار القواعد التاريخية..."):
+                bt = backtest(data_engine.get_stock_history, SHARIA_SYMBOLS)
+            if bt.get("success"):
+                st.success(f'العينات: {bt["samples"]} • النجاح: {bt["win_rate"]}% • متوسط العائد: {bt["avg_return"]}% • Profit Factor: {bt["profit_factor"] or "—"}')
+            else:
+                st.warning(bt.get("reason", "تعذر تشغيل الاختبار."))
+        st.info("نتائج الـBacktest وسجل الأداء أدوات قياس تاريخية وليست ضمانًا للنتائج المستقبلية.")
+    except Exception as exc:
+        st.warning(f"تعذر قراءة سجل الأداء حاليًا: {exc}")
+
 elif page == "⚙  الإعدادات":
     st.markdown(
         '<div class="hero"><div class="hero-title">الإعدادات وحالة النظام</div>'
