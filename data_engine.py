@@ -8,6 +8,7 @@ import requests
 import streamlit as st
 
 from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE
+from ml_engine import train_and_predict
 
 
 def get_secret(name):
@@ -468,6 +469,7 @@ class DataEngine:
         else:
             status = "محايد"
 
+        ml = train_and_predict(frame)
         chart = frame.tail(120)[["date", "close", "sma20", "sma50", "sma200"]].copy()
         chart["date"] = chart["date"].dt.strftime("%Y-%m-%d")
 
@@ -498,6 +500,7 @@ class DataEngine:
             "status": status,
             "history_rows": len(frame),
             "chart": chart,
+            "ml": ml,
         }
 
     def get_company_snapshot(self, symbol):
@@ -749,13 +752,15 @@ class DataEngine:
         risk = float(analysis.get("risk_score") or 0)
         market_adj = 8 if market and market.get("regime") == "إيجابي" else (-10 if market and market.get("regime") == "ضعيف" else 0)
         news_adj = max(-8, min(8, news_score * 8)) if news_score is not None else 0
-        final_score = max(0, min(100, round(trend * 0.35 + rebound * 0.45 + (100-risk) * 0.20 + market_adj + news_adj)))
+        ml_probability = analysis.get("ml", {}).get("probability") if isinstance(analysis.get("ml"), dict) and analysis.get("ml", {}).get("success") else None
+        ml_adj = ((float(ml_probability) - 50.0) * 0.12) if ml_probability is not None else 0
+        final_score = max(0, min(100, round(trend * 0.35 + rebound * 0.45 + (100-risk) * 0.20 + market_adj + news_adj + ml_adj)))
         setup = "ارتداد محتمل" if rebound >= 55 else ("تحت المراقبة" if rebound >= 35 else "لا توجد إشارة ارتداد كافية")
         target1 = close + atr if close is not None and atr else None
         target2 = close + (2 * atr) if close is not None and atr else None
         stop = close - (1.2 * atr) if close is not None and atr else None
         rr = ((target1-close)/(close-stop)) if target1 is not None and stop is not None and close != stop else None
-        return {"rebound_score": round(rebound), "final_opportunity_score": final_score, "setup": setup, "entry_reference": close, "target1": target1, "target2": target2, "stop": stop, "invalidation": support * 0.98 if support else None, "risk_reward": rr, "market_regime": (market or {}).get("regime", "غير متاح"), "news_score": news_score}
+        return {"rebound_score": round(rebound), "final_opportunity_score": final_score, "setup": setup, "entry_reference": close, "target1": target1, "target2": target2, "stop": stop, "invalidation": support * 0.98 if support else None, "risk_reward": rr, "market_regime": (market or {}).get("regime", "غير متاح"), "news_score": news_score, "ml_probability": ml_probability}
 
     @st.cache_data(ttl=900, show_spinner=False)
     def get_opportunities(_self, limit=20):
