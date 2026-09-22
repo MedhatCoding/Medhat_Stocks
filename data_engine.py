@@ -786,6 +786,53 @@ class DataEngine:
             regime = "متذبذب"
         return {"success": True, "symbol": history["symbol"], "date": str(frame.iloc[-1]["date"].date()), "close": self._num(close.iloc[-1]), "sma20": self._num(sma20), "sma50": self._num(sma50), "return20": self._num(ret20), "regime": regime}
 
+    def get_market_snapshot(self, limit=96):
+        """Build a compact EGX market board from available daily quotes."""
+        rows = []
+        symbols = list(dict.fromkeys(SHARIA_SYMBOLS))[:max(1, int(limit))]
+        for symbol in symbols:
+            try:
+                hist = self.get_stock_history(symbol, days=35)
+                data = hist.get("data", []) if hist.get("success") else []
+                if len(data) < 2:
+                    continue
+                frame = self._series(data)
+                if len(frame) < 2:
+                    continue
+                last = frame.iloc[-1]
+                prev = frame.iloc[-2]
+                close = self._num(last.get("close"))
+                previous = self._num(prev.get("close"))
+                volume = self._num(last.get("volume"))
+                if close is None or previous in (None, 0):
+                    continue
+                change = (close / previous - 1) * 100
+                avg_vol = frame["volume"].tail(20).mean() if "volume" in frame else None
+                volume_ratio = (volume / avg_vol) if volume is not None and avg_vol and avg_vol > 0 else None
+                rows.append({
+                    "symbol": symbol,
+                    "name": self.arabic_company_name(symbol, symbol),
+                    "close": close,
+                    "change_pct": change,
+                    "volume": volume,
+                    "volume_ratio": volume_ratio,
+                })
+            except Exception:
+                continue
+        rows.sort(key=lambda x: x["change_pct"], reverse=True)
+        gainers = rows[:5]
+        losers = sorted(rows, key=lambda x: x["change_pct"])[:5]
+        volume_leaders = sorted(rows, key=lambda x: x.get("volume") or 0, reverse=True)[:5]
+        advances = sum(1 for x in rows if x["change_pct"] > 0.05)
+        declines = sum(1 for x in rows if x["change_pct"] < -0.05)
+        unchanged = len(rows) - advances - declines
+        return {
+            "success": True, "count": len(rows), "rows": rows,
+            "gainers": gainers, "losers": losers, "volume_leaders": volume_leaders,
+            "advances": advances, "declines": declines, "unchanged": unchanged,
+            "breadth": round(advances / len(rows) * 100, 1) if rows else None,
+        }
+
     def _opportunity_setup(self, analysis, market=None, news_score=None):
         close, rsi, ret20 = analysis.get("close"), analysis.get("rsi14"), analysis.get("return20")
         atr, support = analysis.get("atr14"), analysis.get("support")
