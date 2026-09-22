@@ -9,6 +9,7 @@ import streamlit as st
 
 from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE
 from ml_engine import train_and_predict
+from recommendation_journal import adaptive_feedback, record_opportunity
 
 
 def get_secret(name):
@@ -469,7 +470,7 @@ class DataEngine:
         else:
             status = "محايد"
 
-        ml = train_and_predict(frame)
+        ml = train_and_predict(frame, feedback=adaptive_feedback())
         chart = frame.tail(120)[["date", "close", "sma20", "sma50", "sma200"]].copy()
         chart["date"] = chart["date"].dt.strftime("%Y-%m-%d")
 
@@ -493,6 +494,12 @@ class DataEngine:
             "return60": ret60,
             "volatility20": vol20,
             "volume_ratio": vol_ratio,
+            "volatility20": vol20,
+            "atr_pct": (atr / last_close * 100) if atr and last_close else None,
+            "distance_support_pct": ((last_close - support) / last_close * 100) if last_close and support else None,
+            "trend20": (last_close / sma20 - 1) if last_close and sma20 else None,
+            "trend50": (last_close / sma50 - 1) if last_close and sma50 else None,
+            "return60": ret60,
             "support": support,
             "resistance": resistance,
             "opportunity_score": opportunity_score,
@@ -872,7 +879,7 @@ class DataEngine:
         if not candidates: candidates = [{"code": s} for s in SHARIA_SYMBOLS]
         market = _self.get_market_context()
         rows = []
-        for item in candidates[:40]:
+        for item in candidates[:len(SHARIA_SYMBOLS)]:
             symbol = str(item.get("code") or "").upper()
             if symbol not in SHARIA_SYMBOLS: continue
             analysis = _self.analyze_stock(symbol)
