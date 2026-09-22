@@ -714,6 +714,7 @@ elif page == "✦  الفرص":
                 f'{app_card("نسبة التغير", pct(row.get("change_pct")), "الجلسة الأخيرة", value_class(row.get("change_pct")))}'
                 f'{app_card("الفرصة", row.get("opportunity_score","—"), "من 100")}'
                 f'{app_card("المخاطر", row.get("risk_score","—"), "من 100")}'
+                f'{app_card("الثقة", row.get("confidence_score","—"), "مؤشر معايرة")}'
                 f'</div>',
                 unsafe_allow_html=True,
             )
