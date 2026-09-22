@@ -877,6 +877,12 @@ class DataEngine:
         screen = _self._get("screener", {"filters": json.dumps(filters, ensure_ascii=False), "sort": "refund_5d_p.asc", "limit": 100}, timeout=40)
         candidates = (screen.get("data") or {}).get("data", []) if screen.get("success") else []
         if not candidates: candidates = [{"code": s} for s in SHARIA_SYMBOLS]
+        # Close older recommendations first so the next ML run can learn from real outcomes.
+        try:
+            from recommendation_journal import evaluate_open
+            evaluate_open(_self.get_stock_history, horizon=10)
+        except Exception:
+            pass
         market = _self.get_market_context()
         rows = []
         for item in candidates[:len(SHARIA_SYMBOLS)]:
@@ -894,6 +900,11 @@ class DataEngine:
             rows.append({"symbol": symbol, "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
                 "name_en": item.get("name") or symbol, "date": analysis.get("date"), "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE})
         rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
+        for row in rows[:max(1, min(int(limit), 40))]:
+            try:
+                record_opportunity(row)
+            except Exception:
+                pass
         return {"success": True, "data": rows[:max(1, min(int(limit), 40))], "count": len(rows), "market": market, "sharia_universe_count": len(SHARIA_SYMBOLS)}
 
 
