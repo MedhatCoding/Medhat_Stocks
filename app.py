@@ -580,6 +580,7 @@ if page == "⌂  الرئيسية":
                     f'{app_card("الفرصة", row.get("opportunity_score","—"), "من 100")}'
                     f'{app_card("الارتداد", row.get("rebound_score","—"), row.get("setup",""))}'
                     f'{app_card("المخاطر", row.get("risk_score","—"), "من 100")}'
+                f'{app_card("الثقة", row.get("confidence_score","—"), "مؤشر معايرة")}'
                     '</div>',
                     unsafe_allow_html=True,
                 )
@@ -754,7 +755,7 @@ elif page == "✦  الفرص":
             avg_ml = sum(float(x["ml_probability"]) for x in ml_rows) / len(ml_rows)
             st.markdown(
                 f'<div class="premarket"><div class="premarket-title">🧠 التعلم الآلي</div>'
-                f'<div class="premarket-body">النموذج يتعلم من السلوك التاريخي لكل سهم ويؤثر تدريجيًا في درجة الفرصة. '
+                f'<div class="premarket-body">النموذج يستخدم التاريخ السعري، ويُعاد معايرته مع نتائج التوصيات المغلقة. '
                 f'متوسط الاحتمال التاريخي في المرشحين الحاليين: <b>{avg_ml:.1f}%</b>.</div></div>',
                 unsafe_allow_html=True,
             )
@@ -769,7 +770,7 @@ elif page == "✦  الفرص":
                     f"\n<b>{name}</b> ({row.get('symbol','—')})\n"
                     f"السعر: {money(row.get('close'))} • التغير: {pct(row.get('change_pct'))}\n"
                     f"الفرصة: {row.get('opportunity_score','—')}/100 • المخاطر: {row.get('risk_score','—')}{ml_text}\n"
-                    f"الدخول المرجعي: {money(row.get('entry_reference'))} • الهدف 1: {money(row.get('target1'))} • الإلغاء: {money(row.get('invalidation'))}"
+                    f"الدخول: {money(row.get('entry_reference'))} • الهدف 1: {money(row.get('target1'))} • الهدف 2: {money(row.get('target2'))} • وقف الخسارة: {money(row.get('stop'))} • الإلغاء: {money(row.get('invalidation'))}"
                 )
             ok, msg = send_telegram("\n".join(lines))
             st.success(msg) if ok else st.error(msg)
