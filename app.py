@@ -645,36 +645,88 @@ if page == "⌂  الرئيسية":
 elif page == "◉  السوق":
     st.markdown(
         '<div class="hero"><div class="hero-title">السوق المصري</div>'
-        '<div class="hero-sub">حالة EGX30 مستقلة عن تحليل سهم بعينه، مع آخر جلسة مكتملة واتجاه متوسطات السوق.</div></div>',
+        '<div class="hero-sub">لوحة السوق: EGX30، اتساع السوق، الأسهم الأكثر ارتفاعًا وانخفاضًا، وقادة التداول من البيانات المتاحة.</div></div>',
         unsafe_allow_html=True,
     )
-    with st.spinner("جاري قراءة حالة EGX30..."):
+
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        st.caption("البيانات المعروضة هي آخر بيانات سوقية متاحة من مصادر التطبيق.")
+    with c2:
+        refresh_market = st.button("↻ تحديث السوق", use_container_width=True)
+
+    with st.spinner("جاري تجميع لوحة السوق..."):
         market = data_engine.get_market_context()
+        snapshot = data_engine.get_market_snapshot(limit=len(SHARIA_SYMBOLS))
+
     if not market.get("success"):
-        st.error(market.get("error", "تعذر قراءة السوق."))
+        st.error(market.get("error", "تعذر قراءة EGX30."))
     else:
         st.markdown(
-            f'<div class="premarket"><div class="premarket-title">حالة السوق</div>'
+            f'<div class="premarket"><div class="premarket-title">EGX30</div>'
             f'<div class="premarket-time">آخر جلسة مكتملة: {market.get("date","—")}</div>'
-            f'<div class="premarket-body">EGX30: <b>{money(market.get("close"))}</b> • '
-            f'SMA20: <b>{money(market.get("sma20"))}</b> • SMA50: <b>{money(market.get("sma50"))}</b> • '
-            f'العائد 20 جلسة: <b>{pct(market.get("return20"))}</b> • '
-            f'النظام: <b>{market.get("regime","—")}</b></div></div>',
+            f'<div class="premarket-body">القيمة: <b>{money(market.get("close"))}</b> • '
+            f'SMA20: <b>{money(market.get("sma20"))}</b> • '
+            f'SMA50: <b>{money(market.get("sma50"))}</b> • '
+            f'تغير 20 جلسة: <b>{pct(market.get("return20"))}</b> • '
+            f'حالة السوق: <b>{market.get("regime","—")}</b></div></div>',
             unsafe_allow_html=True,
         )
-        last = st.session_state.last_analysis
-        if last:
-            st.markdown('<div class="section">آخر سهم تم تحليله</div>', unsafe_allow_html=True)
-            st.markdown(
-                '<div class="m-card-grid">'
-                f'{app_card("الشركة", data_engine.arabic_company_name(last.get("symbol","—"), last.get("symbol","—")), "رمز التداول: " + last.get("symbol","—"))}'
-                f'{app_card("RSI", money(last.get("rsi14")), "14 جلسة")}'
-                f'{app_card("الفرصة", last.get("final_opportunity_score",last.get("opportunity_score","—")), "من 100")}'
-                f'{app_card("المخاطر", last.get("risk_score","—"), "من 100")}'
-                '</div>',
-                unsafe_allow_html=True,
-            )
 
+    if snapshot.get("success"):
+        total = snapshot.get("count", 0)
+        advances, declines, unchanged = snapshot.get("advances", 0), snapshot.get("declines", 0), snapshot.get("unchanged", 0)
+        st.markdown('<div class="section">اتساع السوق</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="m-card-grid">'
+            f'{app_card("أسهم صاعدة", advances, f"من {total}")}'
+            f'{app_card("أسهم هابطة", declines, f"من {total}")}'
+            f'{app_card("دون تغيير", unchanged, f"من {total}")}'
+            f'{app_card("نسبة الصعود", f"{snapshot.get("breadth","—")}%", "من العينة المتاحة")}'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        def market_rows(title, rows, empty="لا توجد بيانات كافية"):
+            st.markdown(f'<div class="section">{title}</div>', unsafe_allow_html=True)
+            if not rows:
+                st.info(empty)
+                return
+            table = pd.DataFrame(rows)
+            table["اسم الشركة"] = table["symbol"].apply(lambda s: data_engine.arabic_company_name(s, s))
+            table["التغير %"] = table["change_pct"].map(lambda x: f"{x:+.2f}%")
+            table["السعر"] = table["close"].map(lambda x: money(x))
+            cols = ["اسم الشركة", "symbol", "السعر", "التغير %"]
+            if "volume" in table:
+                table["الحجم"] = table["volume"].map(lambda x: f"{x:,.0f}" if pd.notna(x) else "—")
+                cols.append("الحجم")
+            if "volume_ratio" in table:
+                table["نسبة الحجم"] = table["volume_ratio"].map(lambda x: f"{x:.1f}x" if pd.notna(x) else "—")
+                cols.append("نسبة الحجم")
+            st.dataframe(table[cols], use_container_width=True, hide_index=True)
+
+        left, right = st.columns(2)
+        with left:
+            market_rows("🚀 الأكثر ارتفاعًا", snapshot.get("gainers", []))
+        with right:
+            market_rows("🔻 الأكثر انخفاضًا", snapshot.get("losers", []))
+
+        market_rows("📊 الأعلى تداولًا بالحجم", snapshot.get("volume_leaders", []))
+
+        st.markdown('<div class="section">خريطة سريعة للسوق</div>', unsafe_allow_html=True)
+        quick = pd.DataFrame(snapshot.get("rows", []))
+        if not quick.empty:
+            quick["اسم الشركة"] = quick["symbol"].apply(lambda s: data_engine.arabic_company_name(s, s))
+            quick["الحالة"] = quick["change_pct"].apply(lambda x: "🟢 صاعد" if x > 0.05 else ("🔴 هابط" if x < -0.05 else "⚪ ثابت"))
+            quick["التغير %"] = quick["change_pct"].map(lambda x: f"{x:+.2f}%")
+            quick["السعر"] = quick["close"].map(money)
+            st.dataframe(
+                quick[["اسم الشركة", "symbol", "السعر", "التغير %", "الحالة"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+    else:
+        st.warning("لم تصل بيانات كافية لبناء لوحة السوق. جرّب تحديث السوق بعد قليل.")
 
 # -----------------------------
 # Opportunities
