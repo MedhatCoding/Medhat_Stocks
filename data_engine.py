@@ -647,7 +647,15 @@ class DataEngine:
         return {"success": True, "data": clean, "provider": "EODHD"}
 
     def get_market_context(self):
-        index_symbol = os.getenv("EGX_INDEX_SYMBOL", "EGX30")
+        """Return a resilient EGX30 market snapshot.
+        Prefer OANOR, then EODHD's index namespace (INDX), then Yahoo's CASE30 index.
+        """
+        index_candidates = [
+            os.getenv("EGX_INDEX_SYMBOL", "EGX30.INDX"),
+            "EGX30.INDX",
+            "CASE30.INDX",
+        ]
+
         if self.oanor_api_key:
             idx = self._oanor_get("egx-api/v1/index", timeout=15)
             if idx.get("success"):
@@ -656,15 +664,108 @@ class DataEngine:
                 if isinstance(row, list):
                     row = row[0] if row else {}
                 if isinstance(row, dict):
+                    close = self._num(row.get("value") or row.get("close") or row.get("price"))
+                    if close is not None:
+                        return {
+                            "success": True, "available": True, "symbol": "EGX30",
+                            "date": row.get("date") or row.get("timestamp"),
+                            "close": close,
+                            "sma20": None, "sma50": None,
+                            "return20": self._num(row.get("change_pct") or row.get("changePercent")),
+                            "regime": "بيانات EGX30 الحالية متاحة",
+                        }
+
+        # EODHD treats indices as INDX instruments, not EGX equities.
+        for candidate in index_candidates:
+            history = self._get(
+                f"eod/{candidate}",
+                {"period": "d", "order": "d"},
+                timeout=25,
+            )
+            if not history.get("success"):
+                continue
+            rows = history.get("data") or []
+            if not isinstance(rows, list) or len(rows) < 30:
+                continue
+            frame = self._series(rows)
+            if len(frame) < 30:
+                continue
+            close = frame["close"]
+            sma20 = close.rolling(20).mean().iloc[-1]
+            sma50 = close.rolling(50).mean().iloc[-1]
+            ret20 = close.pct_change(20).iloc[-1] * 100
+            if close.iloc[-1] > sma20 > sma50 and ret20 > 0:
+                regime = "إيجابي"
+            elif close.iloc[-1] < sma20 < sma50 and ret20 < 0:
+                regime = "ضعيف"
+            else:
+                regime = "متذبذب"
+            return {
+                "success": True, "available": True, "symbol": candidate,
+                "date": str(frame.iloc[-1]["date"].date()),
+                "close": self._num(close.iloc[-1]),
+                "sma20": self._num(sma20),
+                "sma50": self._num(sma50),
+                "return20": self._num(ret20),
+                "regime": regime,
+            }
+
+        # Yahoo fallback for the Egyptian EGX30 benchmark.
+        try:
+            response = requests.get(
+                "https://query1.finance.yahoo.com/v8/finance/chart/%5ECASE30",
+                params={"range": "2y", "interval": "1d", "events": "history"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=20,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            item = ((payload.get("chart") or {}).get("result") or [None])[0]
+            if item:
+                ts = item.get("timestamp") or []
+                q = ((item.get("indicators") or {}).get("quote") or [{}])[0]
+                closes = q.get("close") or []
+                rows = [
+                    {"date": datetime.fromtimestamp(stamp, timezone.utc).strftime("%Y-%m-%d"), "close": closes[i]}
+                    for i, stamp in enumerate(ts)
+                    if i < len(closes) and closes[i] is not None
+                ]
+                if len(rows) >= 30:
+                    frame = self._series(rows)
+                    close = frame["close"]
+                    sma20 = close.rolling(20).mean().iloc[-1]
+                    sma50 = close.rolling(50).mean().iloc[-1]
+                    ret20 = close.pct_change(20).iloc[-1] * 100
+                    if close.iloc[-1] > sma20 > sma50 and ret20 > 0:
+                        regime = "إيجابي"
+                    elif close.iloc[-1] < sma20 < sma50 and ret20 < 0:
+                        regime = "ضعيف"
+                    else:
+                        regime = "متذبذب"
                     return {
-                        "success": True, "available": True, "symbol": "EGX30",
-                        "date": row.get("date") or row.get("timestamp"),
-                        "close": self._num(row.get("value") or row.get("close") or row.get("price")),
-                        "sma20": None, "sma50": None,
-                        "return20": self._num(row.get("change_pct") or row.get("changePercent")),
-                        "regime": "بيانات EGX30 الحالية متاحة",
+                        "success": True, "available": True, "symbol": "^CASE30",
+                        "date": str(frame.iloc[-1]["date"].date()),
+                        "close": self._num(close.iloc[-1]),
+                        "sma20": self._num(sma20),
+                        "sma50": self._num(sma50),
+                        "return20": self._num(ret20),
+                        "regime": regime,
                     }
-        history = self.get_stock_history(index_symbol, days=220)
+        except (requests.RequestException, ValueError, TypeError, KeyError):
+            pass
+
+        return {
+            "success": True,
+            "available": False,
+            "symbol": "EGX30",
+            "date": None,
+            "close": None,
+            "sma20": None,
+            "sma50": None,
+            "return20": None,
+            "regime": "بيانات المؤشر غير متاحة",
+            "message": "بيانات EGX30 غير متاحة حاليًا من مزودي الأسعار. تم الاستمرار بدون قراءة المؤشر.",
+        }
         if not history["success"] or len(history["data"]) < 30:
             # Yahoo lists the EGX 30 benchmark as ^CASE30.
             try:
