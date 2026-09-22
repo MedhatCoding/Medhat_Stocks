@@ -51,6 +51,13 @@ def record_opportunity(row):
         "rebound_score": row.get("rebound_score"),
         "ml_probability": row.get("ml_probability"),
         "market_regime": row.get("market_regime"),
+        "features": {
+            "rsi14": row.get("rsi14"), "return20": row.get("return20"),
+            "return60": row.get("return60"), "volatility20": row.get("volatility20"),
+            "volume_ratio": row.get("volume_ratio"), "atr_pct": row.get("atr_pct"),
+            "distance_support_pct": row.get("distance_support_pct"),
+            "trend20": row.get("trend20"), "trend50": row.get("trend50"),
+        },
         "status": "open",
         "outcome": None,
         "outcome_return_pct": None,
