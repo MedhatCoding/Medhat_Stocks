@@ -6,7 +6,7 @@ FEATURES = ["rsi14","return20","return60","volatility20","volume_ratio","atr_pct
 def _sigmoid(z):
     return 1.0 / (1.0 + np.exp(-np.clip(z, -30, 30)))
 
-def train_and_predict(frame, horizon=10, target_pct=3.0, stop_pct=4.0):
+def train_and_predict(frame, horizon=10, target_pct=3.0, stop_pct=4.0, feedback=None):
     if frame is None or len(frame) < 90:
         return {"success": False, "reason": "بيانات تاريخية غير كافية لتدريب النموذج"}
     w = frame.copy().reset_index(drop=True)
@@ -36,6 +36,22 @@ def train_and_predict(frame, horizon=10, target_pct=3.0, stop_pct=4.0):
         hit_stop = bool((lows <= entry*(1-stop_pct/100)).any())
         y.append(1.0 if hit_target and not hit_stop else 0.0)
     y = pd.Series(y)
+    # Add only closed, real recommendation outcomes. Historical rows remain the base.
+    feedback_rows = []
+    for item in (feedback or []):
+        features = item.get("features") or {}
+        outcome = item.get("outcome")
+        if outcome not in ("target1", "target2", "stop"):
+            continue
+        row = {name: pd.to_numeric(features.get(name), errors="coerce") for name in FEATURES}
+        row["_target"] = 1.0 if outcome in ("target1", "target2") else 0.0
+        if all(pd.notna(row[name]) for name in FEATURES):
+            feedback_rows.append(row)
+    if feedback_rows:
+        fx = pd.DataFrame([{k: v for k, v in r.items() if k != "_target"} for r in feedback_rows])
+        fy = pd.Series([r["_target"] for r in feedback_rows])
+        x = pd.concat([x, fx], ignore_index=True)
+        y = pd.concat([y, fy], ignore_index=True)
     valid = x.notna().all(axis=1) & y.notna()
     idx = np.where(valid.values)[0]
     if len(idx) < 45 or len(np.unique(y.iloc[idx])) < 2:
@@ -59,4 +75,5 @@ def train_and_predict(frame, horizon=10, target_pct=3.0, stop_pct=4.0):
             "validation_samples":int(len(val)),
             "validation_accuracy":round(accuracy*100,1) if accuracy is not None else None,
             "target_pct":target_pct,"stop_pct":stop_pct,"horizon_days":horizon,
-            "method":"Logistic regression / historical walk-forward"}
+            "method":"Logistic regression / historical walk-forward + closed recommendation feedback",
+            "feedback_samples": len(feedback_rows)}
