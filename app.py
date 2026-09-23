@@ -659,8 +659,23 @@ elif page == "◉  السوق":
         market = data_engine.get_market_context()
         snapshot = data_engine.get_market_snapshot(limit=len(SHARIA_SYMBOLS))
 
+    indices_board = data_engine.get_market_indices()
+    if indices_board.get("success") and indices_board.get("indices"):
+        st.markdown('<div class="section">مؤشرات البورصة المصرية</div>', unsafe_allow_html=True)
+        idxdf = pd.DataFrame(indices_board["indices"])
+        idxdf["المؤشر"] = idxdf["name"]
+        idxdf["القيمة"] = idxdf["close"].map(money)
+        idxdf["التغير اليومي"] = idxdf["change_pct"].map(lambda x: f"{x:+.2f}%")
+        idxdf["التغير 20 جلسة"] = idxdf["return20"].map(lambda x: f"{x:+.2f}%" if pd.notna(x) else "—")
+        st.dataframe(
+            idxdf[["المؤشر", "القيمة", "التغير اليومي", "التغير 20 جلسة"]],
+            use_container_width=True, hide_index=True
+        )
+    else:
+        st.warning("تعذر جلب مؤشرات EGX الآن؛ سيتم عرضها تلقائيًا عند توفر مصدر البيانات.")
+
     if not market.get("success"):
-        st.error(market.get("error", "تعذر قراءة EGX30."))
+        st.error(market.get("error", "تعذر قراءة مؤشر EGX30."))
     else:
         st.markdown(
             f'<div class="premarket"><div class="premarket-title">EGX30</div>'
