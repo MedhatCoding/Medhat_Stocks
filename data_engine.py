@@ -786,6 +786,45 @@ class DataEngine:
             regime = "متذبذب"
         return {"success": True, "symbol": history["symbol"], "date": str(frame.iloc[-1]["date"].date()), "close": self._num(close.iloc[-1]), "sma20": self._num(sma20), "sma50": self._num(sma50), "return20": self._num(ret20), "regime": regime}
 
+    def get_market_indices(self):
+        """Fetch the main EGX index family, not EGX30 alone."""
+        definitions = [
+            ("EGX30", ["EGX30.INDX", "CASE30.INDX"]),
+            ("EGX70 EWI", ["EGX70.INDX", "EGX70_EWI.INDX"]),
+            ("EGX100 EWI", ["EGX100.INDX", "EGX100_EWI.INDX"]),
+            ("EGX30 CAP", ["EGX30CAP.INDX", "EGX30_CAP.INDX"]),
+            ("EGX30-TR", ["EGX30TR.INDX", "EGX30_TR.INDX"]),
+            ("EGX35-LV", ["EGX35LV.INDX", "EGX35_LV.INDX"]),
+            ("EGX SHARIAH", ["EGXSHARIAH.INDX", "EGX_SHARIAH.INDX"]),
+            ("TAMAYUZ", ["TAMAYUZ.INDX"]),
+        ]
+        result = []
+        for name, candidates in definitions:
+            item = None
+            for symbol in candidates:
+                try:
+                    history = self._get(f"eod/{symbol}", {"period": "d", "order": "d"}, timeout=20)
+                    rows = history.get("data") or [] if history.get("success") else []
+                    if len(rows) >= 2:
+                        frame = self._series(rows)
+                        if len(frame) >= 2:
+                            close = self._num(frame["close"].iloc[-1])
+                            prev = self._num(frame["close"].iloc[-2])
+                            if close is not None and prev not in (None, 0):
+                                change = (close / prev - 1) * 100
+                                ret20 = self._num(frame["close"].pct_change(20).iloc[-1] * 100) if len(frame) >= 21 else None
+                                item = {
+                                    "name": name, "symbol": symbol, "close": close,
+                                    "change_pct": change, "return20": ret20,
+                                    "date": str(frame.iloc[-1]["date"].date()),
+                                }
+                                break
+                except Exception:
+                    continue
+            if item:
+                result.append(item)
+        return {"success": True, "count": len(result), "indices": result}
+    
     def get_market_snapshot(self, limit=96):
         """Build a compact EGX market board from available daily quotes."""
         rows = []
