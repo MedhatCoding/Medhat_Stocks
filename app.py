@@ -688,6 +688,22 @@ elif page == "◉  السوق":
             unsafe_allow_html=True,
         )
 
+    indices_result = data_engine.get_market_indices()
+    indices = indices_result.get("indices", []) if indices_result.get("success") else []
+    st.markdown('<div class="section">📈 جميع مؤشرات EGX</div>', unsafe_allow_html=True)
+    if indices:
+        idx_df = pd.DataFrame(indices)
+        idx_df["التغير %"] = idx_df["change_pct"].map(lambda x: f"{x:+.2f}%")
+        idx_df["تغير 20 جلسة %"] = idx_df["return20"].map(lambda x: f"{x:+.2f}%" if pd.notna(x) else "—")
+        idx_df["القيمة"] = idx_df["close"].map(money)
+        idx_df["الاتجاه"] = idx_df["change_pct"].apply(lambda x: "🟢 صاعد" if x > 0.05 else ("🔴 هابط" if x < -0.05 else "⚪ ثابت"))
+        st.dataframe(
+            idx_df[["name", "symbol", "القيمة", "التغير %", "تغير 20 جلسة %", "الاتجاه"]],
+            use_container_width=True, hide_index=True
+        )
+    else:
+        st.warning("تعذر جلب بيانات مؤشرات EGX حاليًا من مزود البيانات.")
+
     if snapshot.get("success"):
         total = snapshot.get("count", 0)
         advances, declines, unchanged = snapshot.get("advances", 0), snapshot.get("declines", 0), snapshot.get("unchanged", 0)
