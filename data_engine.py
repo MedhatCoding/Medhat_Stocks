@@ -1026,7 +1026,8 @@ class DataEngine:
         technical = self.analyze_stock(symbol)
         if not technical.get("success"): return technical
         symbol_display = self.display_symbol(symbol)
-        sharia = symbol_display in SHARIA_SYMBOLS
+        fund_info = SHARIA_FUND_MAP.get(symbol_display.upper())
+        sharia = symbol_display in SHARIA_SYMBOLS or bool(fund_info)
         fundamentals = self.get_company_snapshot(symbol_display)
         news = self.get_news(symbol_display, limit=8)
         news_rows = news.get("data", []) if news.get("success") else []
@@ -1046,7 +1047,6 @@ class DataEngine:
         setup["seasonality_score"] = seasonality_score
         setup["seasonality"] = seasonality
         setup["final_opportunity_score"] = max(0, min(100, round(float(setup.get("final_opportunity_score", setup.get("opportunity_score", 50))) + (seasonality_score - 50) * 0.12)))
-        fund_info = SHARIA_FUND_MAP.get(symbol_display.upper())
         return {**technical, "sharia_compliant": sharia, "sharia_fund": bool(fund_info), "fund_info": fund_info or {}, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "fundamentals": fundamentals if fundamentals.get("success") else {}, "news": news_rows, **setup}
 
 
