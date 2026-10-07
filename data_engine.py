@@ -8,6 +8,7 @@ import requests
 import streamlit as st
 
 from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE
+from sharia_funds import SHARIA_INDEX_FUNDS, SHARIA_FUND_MAP
 from ml_engine import train_and_predict
 from recommendation_journal import adaptive_feedback, record_opportunity
 
@@ -243,6 +244,11 @@ class DataEngine:
             return []
         rows = result["data"]
         ranked = []
+        for fund in SHARIA_INDEX_FUNDS:
+            code, name = fund["symbol"], fund["name"]
+            q = query
+            if q in code.upper() or q in name.upper():
+                ranked.append((-1, code, name))
         for row in rows:
             code = row["code"].upper()
             name = row["name"].upper()
@@ -981,6 +987,27 @@ class DataEngine:
             "sharia_universe_count": opportunities.get("sharia_universe_count", len(SHARIA_SYMBOLS)),
         }
 
+    def get_seasonality(self, frame, min_years=3):
+        """Estimate calendar-month behavior without using the current month."""
+        if frame is None or len(frame) < 180:
+            return {"score": 50, "month": None, "avg_return": None, "samples": 0, "label": "بيانات موسمية غير كافية"}
+        df = frame.copy()
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df["close"] = pd.to_numeric(df["close"], errors="coerce")
+        df = df.dropna(subset=["date", "close"]).sort_values("date")
+        daily = df.set_index("date")["close"].resample("ME").last().pct_change() * 100
+        if daily.empty:
+            return {"score": 50, "month": None, "avg_return": None, "samples": 0, "label": "بيانات موسمية غير كافية"}
+        current_month = datetime.now().month
+        hist = daily[daily.index.month == current_month]
+        if len(hist) < min_years:
+            return {"score": 50, "month": current_month, "avg_return": None, "samples": int(len(hist)), "label": "بيانات موسمية غير كافية"}
+        avg = float(hist.mean())
+        positive = float((hist > 0).mean() * 100)
+        score = max(0, min(100, 50 + avg * 4 + (positive - 50) * 0.35))
+        label = "موسم قوي" if score >= 60 else ("موسم ضعيف" if score <= 40 else "موسم متوازن")
+        return {"score": round(score, 1), "month": current_month, "avg_return": round(avg, 2), "samples": int(len(hist)), "positive_months_pct": round(positive, 1), "label": label}
+
     def get_full_analysis(self, symbol):
         technical = self.analyze_stock(symbol)
         if not technical.get("success"): return technical
@@ -992,8 +1019,14 @@ class DataEngine:
         vals = [x["polarity"] for x in news_rows if x.get("polarity") is not None]
         news_score = sum(vals) / len(vals) if vals else None
         market = self.get_market_context()
+        seasonality = self.get_seasonality(self._series(self.get_stock_history(symbol, days=1825).get("data", [])))
         setup = self._opportunity_setup(technical, market, news_score)
-        return {**technical, "sharia_compliant": sharia, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "fundamentals": fundamentals if fundamentals.get("success") else {}, "news": news_rows, **setup}
+        # Seasonality is a bounded modifier, never the primary signal.
+        setup["seasonality_score"] = seasonality["score"]
+        setup["seasonality"] = seasonality
+        setup["final_opportunity_score"] = max(0, min(100, round(float(setup.get("final_opportunity_score", setup.get("opportunity_score", 50))) + (seasonality["score"] - 50) * 0.12)))
+        fund_info = SHARIA_FUND_MAP.get(symbol_display.upper())
+        return {**technical, "sharia_compliant": sharia, "sharia_fund": bool(fund_info), "fund_info": fund_info or {}, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "fundamentals": fundamentals if fundamentals.get("success") else {}, "news": news_rows, **setup}
 
 
 data_engine = DataEngine()
