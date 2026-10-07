@@ -1083,6 +1083,20 @@ elif page == "⌕  تحليل":
                         unsafe_allow_html=True,
                     )
 
+                if result.get("sharia_fund"):
+                    fi = result.get("fund_info", {})
+                    st.info(f'📊 صندوق مؤشر الشريعة EGX33 — {fi.get("name","")} • المرجع: {fi.get("benchmark","EGX33 Shariah")}')
+                season = result.get("seasonality") or {}
+                if season:
+                    st.markdown(
+                        '<div class="section">📅 موسمية السوق</div>'
+                        f'<div class="premarket"><div class="premarket-title">{season.get("label","—")}</div>'
+                        f'<div class="premarket-body">متوسط أداء نفس الشهر تاريخيًا: <b>{season.get("avg_return","—")}%</b> • '
+                        f'الفترات الإيجابية: <b>{season.get("positive_months_pct","—")}%</b> • '
+                        f'عينات: <b>{season.get("samples","—")}</b> • عامل الموسمية: <b>{season.get("score","—")}/100</b></div></div>',
+                        unsafe_allow_html=True,
+                    )
+
                 st.markdown('<div class="section">الأخبار</div>', unsafe_allow_html=True)
                 news_rows = result.get("news", [])
                 if news_rows:
