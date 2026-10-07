@@ -1008,6 +1008,20 @@ class DataEngine:
         label = "موسم قوي" if score >= 60 else ("موسم ضعيف" if score <= 40 else "موسم متوازن")
         return {"score": round(score, 1), "month": current_month, "avg_return": round(avg, 2), "samples": int(len(hist)), "positive_months_pct": round(positive, 1), "label": label}
 
+    def get_market_seasonality(self, min_years=3):
+        """Calendar-month behavior of the broad EGX30 market."""
+        for candidate in ["EGX30.INDX", "CASE30.INDX"]:
+            try:
+                history = self._get(f"eod/{candidate}", {"period": "d", "order": "d"}, timeout=25)
+                rows = history.get("data") or [] if history.get("success") else []
+                if len(rows) < 180:
+                    continue
+                frame = self._series(rows)
+                return self.get_seasonality(frame, min_years=min_years)
+            except Exception:
+                continue
+        return {"score": 50, "month": datetime.now().month, "avg_return": None, "samples": 0, "label": "بيانات موسمية للسوق غير كافية"}
+
     def get_full_analysis(self, symbol):
         technical = self.analyze_stock(symbol)
         if not technical.get("success"): return technical
@@ -1019,12 +1033,19 @@ class DataEngine:
         vals = [x["polarity"] for x in news_rows if x.get("polarity") is not None]
         news_score = sum(vals) / len(vals) if vals else None
         market = self.get_market_context()
-        seasonality = self.get_seasonality(self._series(self.get_stock_history(symbol, days=1825).get("data", [])))
+        stock_history = self.get_stock_history(symbol, days=1825)
+        stock_seasonality = self.get_seasonality(self._series(stock_history.get("data", [])), min_years=2)
+        market_seasonality = self.get_market_seasonality(min_years=3)
+        # Market seasonality is dominant; stock seasonality is secondary.
+        seasonality_score = round(market_seasonality["score"] * 0.70 + stock_seasonality["score"] * 0.30, 1)
+        seasonality = {**market_seasonality, "score": seasonality_score,
+                       "market_score": market_seasonality["score"],
+                       "stock_score": stock_seasonality["score"]}
         setup = self._opportunity_setup(technical, market, news_score)
         # Seasonality is a bounded modifier, never the primary signal.
-        setup["seasonality_score"] = seasonality["score"]
+        setup["seasonality_score"] = seasonality_score
         setup["seasonality"] = seasonality
-        setup["final_opportunity_score"] = max(0, min(100, round(float(setup.get("final_opportunity_score", setup.get("opportunity_score", 50))) + (seasonality["score"] - 50) * 0.12)))
+        setup["final_opportunity_score"] = max(0, min(100, round(float(setup.get("final_opportunity_score", setup.get("opportunity_score", 50))) + (seasonality_score - 50) * 0.12)))
         fund_info = SHARIA_FUND_MAP.get(symbol_display.upper())
         return {**technical, "sharia_compliant": sharia, "sharia_fund": bool(fund_info), "fund_info": fund_info or {}, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "fundamentals": fundamentals if fundamentals.get("success") else {}, "news": news_rows, **setup}
 
