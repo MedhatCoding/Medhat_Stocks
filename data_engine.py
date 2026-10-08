@@ -1211,7 +1211,16 @@ class DataEngine:
             polarities = [x for x in polarities if x is not None]
             news_score = (sum(polarities) / len(polarities)) if polarities else None
             setup = _self._opportunity_setup(analysis, market, news_score, seasonality_score)
-            if setup["rebound_score"] < 30: continue
+            # Keep the opportunities screen limited to qualified setups; do not
+            # display blocked or high-risk candidates as actionable opportunities.
+            if setup["hard_blocks"]:
+                continue
+            if setup["final_opportunity_score"] < 55:
+                continue
+            if setup["rebound_score"] < 45:
+                continue
+            if float(analysis.get("risk_score") or 100) > 65:
+                continue
             rows.append({"symbol": symbol, "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
                 "name_en": item.get("name") or symbol, "date": analysis.get("date"), "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "seasonality_score": setup.get("seasonality_score"), "defensive_bias": setup.get("defensive_bias")})
         rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
@@ -1307,7 +1316,8 @@ class DataEngine:
         fundamentals = self.get_company_snapshot(symbol_display)
         news = self.get_news(symbol_display, limit=8)
         news_rows = news.get("data", []) if news.get("success") else []
-        vals = [x["polarity"] for x in news_rows if x.get("polarity") is not None]
+        vals = [self._num(x.get("polarity")) for x in news_rows]
+        vals = [value for value in vals if value is not None]
         news_score = sum(vals) / len(vals) if vals else None
         market = self.get_market_context()
         stock_history = self.get_stock_history(symbol, days=1825)
