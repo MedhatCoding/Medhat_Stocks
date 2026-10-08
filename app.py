@@ -645,123 +645,94 @@ if page == "⌂  الرئيسية":
 elif page == "◉  السوق":
     st.markdown(
         '<div class="hero"><div class="hero-title">السوق المصري</div>'
-        '<div class="hero-sub">لوحة السوق: EGX30، اتساع السوق، الأسهم الأكثر ارتفاعًا وانخفاضًا، وقادة التداول من البيانات المتاحة.</div></div>',
+        '<div class="hero-sub">حالة EGX، المؤشرات الرئيسية، اتساع السوق، والمكوّنات الدفاعية في شاشة واحدة.</div></div>',
+        unsafe_allow_html=True,
+    )
+    if st.button("↻ تحديث السوق", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+    with st.spinner("جاري تجميع بيانات السوق والمؤشرات..."):
+        market=data_engine.get_market_context()
+        snapshot=data_engine.get_market_snapshot(limit=len(SHARIA_SYMBOLS))
+        indices_board=data_engine.get_market_indices()
+        allocation=data_engine.get_asset_allocation_context()
+
+    st.markdown('<div class="section">مؤشرات البورصة المصرية</div>', unsafe_allow_html=True)
+    indices=indices_board.get("indices",[]) if indices_board.get("success") else []
+    if indices:
+        idxdf=pd.DataFrame(indices)
+        idxdf["المؤشر"]=idxdf["name"]
+        idxdf["القيمة"]=idxdf["close"].map(money)
+        idxdf["التغير اليومي"]=idxdf["change_pct"].map(lambda x:f"{float(x):+.2f}%" if x is not None else "—")
+        idxdf["التغير 20 جلسة"]=idxdf["return20"].map(lambda x:f"{float(x):+.2f}%" if x is not None else "—")
+        st.dataframe(idxdf[["المؤشر","القيمة","التغير اليومي","التغير 20 جلسة"]],use_container_width=True,hide_index=True)
+        if len(indices)<4:
+            st.caption("تظهر فقط المؤشرات التي تتوفر لها بيانات فعلية؛ لا يتم اختراع أرقام عند تعذر المصدر.")
+    else:
+        st.info("لا توجد بيانات مؤشرات متاحة حاليًا. اضغط تحديث السوق لإعادة المحاولة.")
+
+    if market.get("success") and market.get("available"):
+        st.markdown(
+            f'<div class="premarket"><div class="premarket-title">EGX30 • {market.get("regime","—")}</div>'
+            f'<div class="premarket-time">آخر جلسة: {market.get("date","—")}</div>'
+            f'<div class="premarket-body">القيمة: <b>{money(market.get("close"))}</b> • '
+            f'SMA20: <b>{money(market.get("sma20"))}</b> • SMA50: <b>{money(market.get("sma50"))}</b> • '
+            f'20 جلسة: <b>{pct(market.get("return20"))}</b></div></div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info("بيانات EGX30 غير متاحة الآن؛ لا يتم عرض قيمة تقديرية.")
+
+    st.markdown('<div class="section">اتساع السوق</div>', unsafe_allow_html=True)
+    if snapshot.get("success"):
+        total=snapshot.get("count",0)
+        st.markdown('<div class="m-card-grid">'
+                    f'{app_card("صاعد",snapshot.get("advances",0),f"من {total}")}'
+                    f'{app_card("هابط",snapshot.get("declines",0),f"من {total}")}'
+                    f'{app_card("ثابت",snapshot.get("unchanged",0),f"من {total}")}'
+                    f'{app_card("نسبة الصعود",f"{snapshot.get("breadth","—")}%" ,"العينة المتاحة")}'
+                    '</div>',unsafe_allow_html=True)
+    else:
+        st.info("لا توجد بيانات كافية لاتساع السوق حاليًا.")
+
+    season=allocation.get("seasonality") or {}
+    st.markdown('<div class="section">📅 موسمية السوق</div>',unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="premarket"><div class="premarket-title">{season.get("label","بيانات موسمية غير كافية")}</div>'
+        f'<div class="premarket-body">متوسط نفس الشهر تاريخيًا: <b>{season.get("avg_return","—")}%</b> • '
+        f'الفترات الإيجابية: <b>{season.get("positive_months_pct","—")}%</b> • '
+        f'العينات: <b>{season.get("samples","—")}</b> • عامل الموسمية: <b>{season.get("score","—")}/100</b></div></div>',
         unsafe_allow_html=True,
     )
 
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        st.caption("البيانات المعروضة هي آخر بيانات سوقية متاحة من مصادر التطبيق.")
-    with c2:
-        refresh_market = st.button("↻ تحديث السوق", use_container_width=True)
-
-    with st.spinner("جاري تجميع لوحة السوق..."):
-        market = data_engine.get_market_context()
-        snapshot = data_engine.get_market_snapshot(limit=len(SHARIA_SYMBOLS))
-
-    indices_board = data_engine.get_market_indices()
-    if indices_board.get("success") and indices_board.get("indices"):
-        st.markdown('<div class="section">مؤشرات البورصة المصرية</div>', unsafe_allow_html=True)
-        idxdf = pd.DataFrame(indices_board["indices"])
-        idxdf["المؤشر"] = idxdf["name"]
-        idxdf["القيمة"] = idxdf["close"].map(money)
-        idxdf["التغير اليومي"] = idxdf["change_pct"].map(lambda x: f"{x:+.2f}%")
-        idxdf["التغير 20 جلسة"] = idxdf["return20"].map(lambda x: f"{x:+.2f}%" if pd.notna(x) else "—")
-        st.dataframe(
-            idxdf[["المؤشر", "القيمة", "التغير اليومي", "التغير 20 جلسة"]],
-            use_container_width=True, hide_index=True
-        )
-    else:
-        st.warning("تعذر جلب مؤشرات EGX الآن؛ سيتم عرضها تلقائيًا عند توفر مصدر البيانات.")
-
-    if not market.get("success"):
-        st.error(market.get("error", "تعذر قراءة مؤشر EGX30."))
-    else:
-        st.markdown(
-            f'<div class="premarket"><div class="premarket-title">EGX30</div>'
-            f'<div class="premarket-time">آخر جلسة مكتملة: {market.get("date","—")}</div>'
-            f'<div class="premarket-body">القيمة: <b>{money(market.get("close"))}</b> • '
-            f'SMA20: <b>{money(market.get("sma20"))}</b> • '
-            f'SMA50: <b>{money(market.get("sma50"))}</b> • '
-            f'تغير 20 جلسة: <b>{pct(market.get("return20"))}</b> • '
-            f'حالة السوق: <b>{market.get("regime","—")}</b></div></div>',
-            unsafe_allow_html=True,
-        )
-
-    indices_result = data_engine.get_market_indices()
-    indices = indices_result.get("indices", []) if indices_result.get("success") else []
-    st.markdown('<div class="section">📈 جميع مؤشرات EGX</div>', unsafe_allow_html=True)
-    if indices:
-        idx_df = pd.DataFrame(indices)
-        idx_df["التغير %"] = idx_df["change_pct"].map(lambda x: f"{x:+.2f}%")
-        idx_df["تغير 20 جلسة %"] = idx_df["return20"].map(lambda x: f"{x:+.2f}%" if pd.notna(x) else "—")
-        idx_df["القيمة"] = idx_df["close"].map(money)
-        idx_df["الاتجاه"] = idx_df["change_pct"].apply(lambda x: "🟢 صاعد" if x > 0.05 else ("🔴 هابط" if x < -0.05 else "⚪ ثابت"))
-        st.dataframe(
-            idx_df[["name", "symbol", "القيمة", "التغير %", "تغير 20 جلسة %", "الاتجاه"]],
-            use_container_width=True, hide_index=True
-        )
-    else:
-        st.warning("تعذر جلب بيانات مؤشرات EGX حاليًا من مزود البيانات.")
+    st.markdown('<div class="section">🧭 صناديق الشريعة والذهب</div>',unsafe_allow_html=True)
+    fund_rows=[]
+    for f in allocation.get("sharia_funds",[]):
+        fund_rows.append({"النوع":"مؤشر شريعة EGX33","الرمز":f["symbol"],"الصندوق":f["name"],"المرجعية الشرعية":"نعم"})
+    for f in allocation.get("gold_funds",[]):
+        fund_rows.append({"النوع":"ذهب","الرمز":f["symbol"],"الصندوق":f["name"],"المرجعية الشرعية":"مؤكدة" if f.get("sharia_compliant") else "غير مؤكدة"})
+    if fund_rows:
+        st.dataframe(pd.DataFrame(fund_rows),use_container_width=True,hide_index=True)
 
     if snapshot.get("success"):
-        total = snapshot.get("count", 0)
-        advances, declines, unchanged = snapshot.get("advances", 0), snapshot.get("declines", 0), snapshot.get("unchanged", 0)
-        st.markdown('<div class="section">اتساع السوق</div>', unsafe_allow_html=True)
-        st.markdown(
-            '<div class="m-card-grid">'
-            f'{app_card("أسهم صاعدة", advances, f"من {total}")}'
-            f'{app_card("أسهم هابطة", declines, f"من {total}")}'
-            f'{app_card("دون تغيير", unchanged, f"من {total}")}'
-            f'{app_card("نسبة الصعود", f"{snapshot.get("breadth","—")}%", "من العينة المتاحة")}'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        def market_rows(title, rows, empty="لا توجد بيانات كافية"):
-            st.markdown(f'<div class="section">{title}</div>', unsafe_allow_html=True)
+        def market_rows(title,rows):
+            st.markdown(f'<div class="section">{title}</div>',unsafe_allow_html=True)
             if not rows:
-                st.info(empty)
+                st.info("لا توجد بيانات كافية")
                 return
-            table = pd.DataFrame(rows)
-            table["اسم الشركة"] = table["symbol"].apply(lambda s: data_engine.arabic_company_name(s, s))
-            table["التغير %"] = table["change_pct"].map(lambda x: f"{x:+.2f}%")
-            table["السعر"] = table["close"].map(lambda x: money(x))
-            cols = ["اسم الشركة", "symbol", "السعر", "التغير %"]
+            table=pd.DataFrame(rows)
+            table["اسم الشركة"]=table["symbol"].apply(lambda s:data_engine.arabic_company_name(s,s))
+            table["التغير %"]=table["change_pct"].map(lambda x:f"{float(x):+.2f}%")
+            table["السعر"]=table["close"].map(money)
+            cols=["اسم الشركة","symbol","السعر","التغير %"]
             if "volume" in table:
-                table["الحجم"] = table["volume"].map(lambda x: f"{x:,.0f}" if pd.notna(x) else "—")
-                cols.append("الحجم")
-            if "volume_ratio" in table:
-                table["نسبة الحجم"] = table["volume_ratio"].map(lambda x: f"{x:.1f}x" if pd.notna(x) else "—")
-                cols.append("نسبة الحجم")
-            st.dataframe(table[cols], use_container_width=True, hide_index=True)
+                table["الحجم"]=table["volume"].map(lambda x:f"{x:,.0f}" if pd.notna(x) else "—"); cols.append("الحجم")
+            st.dataframe(table[cols],use_container_width=True,hide_index=True)
+        left,right=st.columns(2)
+        with left: market_rows("🚀 الأكثر ارتفاعًا",snapshot.get("gainers",[]))
+        with right: market_rows("🔻 الأكثر انخفاضًا",snapshot.get("losers",[]))
+        market_rows("📊 الأعلى تداولًا بالحجم",snapshot.get("volume_leaders",[]))
 
-        left, right = st.columns(2)
-        with left:
-            market_rows("🚀 الأكثر ارتفاعًا", snapshot.get("gainers", []))
-        with right:
-            market_rows("🔻 الأكثر انخفاضًا", snapshot.get("losers", []))
-
-        market_rows("📊 الأعلى تداولًا بالحجم", snapshot.get("volume_leaders", []))
-
-        st.markdown('<div class="section">خريطة سريعة للسوق</div>', unsafe_allow_html=True)
-        quick = pd.DataFrame(snapshot.get("rows", []))
-        if not quick.empty:
-            quick["اسم الشركة"] = quick["symbol"].apply(lambda s: data_engine.arabic_company_name(s, s))
-            quick["الحالة"] = quick["change_pct"].apply(lambda x: "🟢 صاعد" if x > 0.05 else ("🔴 هابط" if x < -0.05 else "⚪ ثابت"))
-            quick["التغير %"] = quick["change_pct"].map(lambda x: f"{x:+.2f}%")
-            quick["السعر"] = quick["close"].map(money)
-            st.dataframe(
-                quick[["اسم الشركة", "symbol", "السعر", "التغير %", "الحالة"]],
-                use_container_width=True,
-                hide_index=True,
-            )
-    else:
-        st.warning("لم تصل بيانات كافية لبناء لوحة السوق. جرّب تحديث السوق بعد قليل.")
-
-# -----------------------------
-# Opportunities
-# -----------------------------
 elif page == "✦  الفرص":
     st.markdown(
         '<div class="hero"><div class="hero-title">الفرص والتوصيات التحليلية</div>'
