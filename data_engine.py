@@ -214,10 +214,18 @@ class DataEngine:
             )
             response.raise_for_status()
             return {"success": True, "data": response.json()}
-        except requests.RequestException as exc:
-            return {"success": False, "error": str(exc)}
-        except ValueError as exc:
-            return {"success": False, "error": f"استجابة OANOR غير صالحة: {exc}"}
+        except requests.HTTPError as exc:
+            status = getattr(exc.response, "status_code", None)
+            if status in (401, 403):
+                return {"success": False, "error": "مفتاح OANOR غير صالح أو غير مصرح لهذا المسار."}
+            if status == 404:
+                return {"success": False, "error": "مسار OANOR المطلوب غير متاح؛ تحقق من مسار API المستخدم."}
+            return {"success": False, "error": f"تعذر جلب بيانات OANOR (HTTP {status or 'error'})."}
+        except requests.RequestException:
+            # Never expose request details or headers because they may include credentials.
+            return {"success": False, "error": "تعذر الاتصال بمزود بيانات OANOR."}
+        except ValueError:
+            return {"success": False, "error": "استجابة JSON غير صالحة من OANOR."}
 
     def get_live_quote(self, symbol):
         code = self.display_symbol(symbol)
