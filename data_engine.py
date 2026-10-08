@@ -8,7 +8,15 @@ import requests
 import streamlit as st
 
 from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE
-from sharia_funds import SHARIA_INDEX_FUNDS, SHARIA_FUND_MAP
+try:
+    from sharia_funds import SHARIA_INDEX_FUNDS, SHARIA_FUND_MAP
+except ImportError:
+    # Keep Streamlit deploys resilient if an older checkout is still cached.
+    SHARIA_INDEX_FUNDS = [
+        {"symbol": "BWA", "name": "بلتون وفرة للاستثمار في أسهم مؤشر الشريعة EGX33", "type": "صندوق مؤشر", "benchmark": "EGX33 Shariah"},
+        {"symbol": "CSF", "name": "مصر شريعة إكويتي - للاستثمار في مؤشر الشريعة EGX33", "type": "صندوق مؤشر", "benchmark": "EGX33 Shariah"},
+    ]
+    SHARIA_FUND_MAP = {x["symbol"]: x for x in SHARIA_INDEX_FUNDS}
 from ml_engine import train_and_predict
 from recommendation_journal import adaptive_feedback, record_opportunity
 
