@@ -8,6 +8,7 @@ seasonality, risk and current portfolio weight. It never invents prices.
 from data_engine import data_engine
 from sharia_funds import SHARIAH_FUND_MAP
 from gold_funds import GOLD_FUND_MAP
+from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE
 
 FUND_MAP = {**SHARIAH_FUND_MAP, **GOLD_FUND_MAP}
 
@@ -34,6 +35,16 @@ def advise(position, analysis=None, market=None, portfolio_value=0.0):
     qty = _num(position.get("qty")) or 0
     avg = _num(position.get("avg")) or 0
     info = asset_info(symbol)
+
+    # Never issue an add/hold/sell quantitative recommendation for an EGX stock
+    # outside the configured Sharia reference universe.
+    if info.get("asset_type") == "سهم شرعي" and symbol not in SHARIA_SYMBOLS:
+        return {
+            "action": "مراجعة شرعية", "action_key": "insufficient",
+            "reason": f"السهم غير موجود في القائمة الشرعية المرجعية بتاريخ {REFERENCE_DATE}؛ لن يتم إصدار توصية كمية له.",
+            "symbol": symbol, "name": info["name"], "asset_type": info["asset_type"],
+            "price": None, "pnl_pct": None, "score": None, "risk": None,
+        }
 
     if analysis is None:
         analysis = data_engine.analyze_stock(symbol)
