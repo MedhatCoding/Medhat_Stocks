@@ -772,9 +772,9 @@ class DataEngine:
     @st.cache_data(ttl=3600, show_spinner=False)
     def get_news(_self, symbol=None, limit=8):
         limit = max(1, min(int(limit), 20))
-        if self.oanor_api_key:
-            query = self.display_symbol(symbol) if symbol else "Egyptian Exchange EGX stocks"
-            oanor = self._oanor_get("news-api/v1/search", {"q": query, "limit": limit, "language": "en"}, timeout=20)
+        if _self.oanor_api_key:
+            query = _self.display_symbol(symbol) if symbol else "Egyptian Exchange EGX stocks"
+            oanor = _self._oanor_get("news-api/v1/search", {"q": query, "limit": limit, "language": "en"}, timeout=20)
             if oanor["success"]:
                 payload = oanor["data"]
                 rows = payload.get("articles") if isinstance(payload, dict) else payload
@@ -788,9 +788,9 @@ class DataEngine:
                             "title": row.get("title") or "",
                             "content": row.get("snippet") or row.get("description") or row.get("content") or "",
                             "link": row.get("url") or row.get("link") or "",
-                            "polarity": self._num(row.get("polarity")),
-                            "positive": self._num(row.get("positive")),
-                            "negative": self._num(row.get("negative")),
+                            "polarity": _self._num(row.get("polarity")),
+                            "positive": _self._num(row.get("positive")),
+                            "negative": _self._num(row.get("negative")),
                             "source": row.get("publisher") or row.get("source") or "OANOR",
                         })
                     if clean:
@@ -798,8 +798,8 @@ class DataEngine:
 
         params = {"limit": limit}
         if symbol:
-            params["s"] = self.normalize_symbol(symbol)
-        result = self._get("news", params=params, timeout=30)
+            params["s"] = _self.normalize_symbol(symbol)
+        result = _self._get("news", params=params, timeout=30)
         if not result["success"]:
             return {"success": False, "error": result["error"], "data": []}
         rows = result["data"] if isinstance(result["data"], list) else []
@@ -813,9 +813,9 @@ class DataEngine:
                 "title": row.get("title") or "",
                 "content": row.get("content") or "",
                 "link": row.get("link") or "",
-                "polarity": self._num(sentiment.get("polarity")),
-                "positive": self._num(sentiment.get("pos")),
-                "negative": self._num(sentiment.get("neg")),
+                "polarity": _self._num(sentiment.get("polarity")),
+                "positive": _self._num(sentiment.get("pos")),
+                "negative": _self._num(sentiment.get("neg")),
                 "source": "EODHD",
             })
         return {"success": True, "data": clean, "provider": "EODHD"}
