@@ -82,7 +82,11 @@ def advise(position, analysis=None, market=None, portfolio_value=0.0):
     ml = analysis.get("ml") or {}
     ml_prob = _num(ml.get("probability"))
     deep_prob = _num(ml.get("deep_learning_probability"))
-    ml_prob = 50.0 if ml_prob is None else ml_prob\n    deep_prob = ml_prob if deep_prob is None else deep_prob\n    if ml_prob > 1: ml_prob /= 100.0\n    if deep_prob > 1: deep_prob /= 100.0\n    combined_prob = (ml_prob + deep_prob) / 2
+    ml_prob = 50.0 if ml_prob is None else ml_prob
+    deep_prob = ml_prob if deep_prob is None else deep_prob
+    if ml_prob > 1: ml_prob /= 100.0
+    if deep_prob > 1: deep_prob /= 100.0
+    combined_prob = (ml_prob + deep_prob) / 2
 
     regime = (market or {}).get("regime", "")
     seasonality = _num((market or {}).get("seasonality_score"))
