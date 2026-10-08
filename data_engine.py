@@ -188,19 +188,30 @@ class DataEngine:
                 timeout=timeout,
             )
             response.raise_for_status()
-            return {"success": True, "data": response.json()}
+            payload = response.json()
+            # EODHD may return an HTTP 200 JSON object containing an API error.
+            if isinstance(payload, dict) and (payload.get("error") or payload.get("message") and not any(k in payload for k in ("data", "close", "Code", "code"))):
+                msg = str(payload.get("error") or payload.get("message") or "").lower()
+                if any(word in msg for word in ("api key", "token", "unauthorized", "forbidden", "limit", "subscription")):
+                    safe = "مفتاح EODHD أو صلاحية الخطة لا تسمح بهذا الطلب."
+                else:
+                    safe = "مزود EODHD أعاد رسالة خطأ بدل بيانات السوق."
+                return {"success": False, "error": safe, "provider_status": "api_error"}
+            return {"success": True, "data": payload}
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
             if status == 404:
-                return {"success": False, "error": "بيانات هذا المسار غير متاحة حاليًا من مزود الأسعار."}
+                return {"success": False, "error": "بيانات هذا الرمز أو المسار غير متاحة من EODHD.", "provider_status": status}
             if status in (401, 403):
-                return {"success": False, "error": "مفتاح مزود بيانات الأسعار غير صالح أو غير مصرح لهذا الطلب."}
-            return {"success": False, "error": f"تعذر جلب بيانات الأسعار (HTTP {status or 'error'})."}
+                return {"success": False, "error": "مفتاح EODHD غير صالح أو لا يملك صلاحية هذا الطلب.", "provider_status": status}
+            if status == 429:
+                return {"success": False, "error": "تم بلوغ حد طلبات EODHD؛ أوقفنا الطلبات الاحتياطية مؤقتًا.", "provider_status": status}
+            return {"success": False, "error": f"تعذر جلب بيانات EODHD (HTTP {status or 'error'}).", "provider_status": status}
         except requests.RequestException:
-            # Do not echo request URLs: they can contain the EODHD API token.
-            return {"success": False, "error": "تعذر الاتصال بمزود بيانات الأسعار."}
+            # Never expose URLs/headers: they can contain credentials.
+            return {"success": False, "error": "تعذر الاتصال بمزود EODHD.", "provider_status": "network_error"}
         except ValueError:
-            return {"success": False, "error": "استجابة غير صالحة من مزود البيانات."}
+            return {"success": False, "error": "استجابة JSON غير صالحة من EODHD.", "provider_status": "invalid_json"}
 
     def _oanor_get(self, path, params=None, timeout=20):
         if not self.oanor_api_key:
