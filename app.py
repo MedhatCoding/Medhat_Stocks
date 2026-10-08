@@ -603,7 +603,10 @@ if page == "⌂  الرئيسية":
     )
 
     with st.spinner("جاري تجهيز تقرير ما قبل الافتتاح..."):
-        premarket = data_engine.get_premarket_report(limit=5)
+        try:
+            premarket = data_engine.get_premarket_report(limit=5)
+        except Exception:
+            premarket = {"success": False, "error": "تعذر تجهيز تقرير السوق حاليًا؛ حاول تحديث الصفحة بعد قليل."}
 
     if premarket.get("success"):
         market = premarket["market"]
@@ -840,7 +843,10 @@ elif page == "✦  الفرص":
     )
 
     with st.spinner("جاري فحص الأسهم المرشحة وتحليل السوق والأخبار..."):
-        opportunities = data_engine.get_opportunities(limit=20)
+        try:
+            opportunities = data_engine.get_opportunities(limit=20)
+        except Exception:
+            opportunities = {"success": False, "error": "تعذر إكمال فحص الفرص الآن؛ حاول تحديث الصفحة بعد قليل."}
 
     if not opportunities.get("success"):
         st.error(opportunities.get("error", "تعذر تشغيل فحص الفرص."))
@@ -1021,7 +1027,10 @@ elif page == "▣  المحفظة":
         total_cost = 0.0
         total_value = 0.0
         for pos in st.session_state.portfolio:
-            price_result = data_engine.get_latest_price(pos["symbol"])
+            try:
+                price_result = data_engine.get_latest_price(pos["symbol"])
+            except Exception:
+                price_result = {"success": False}
             price = price_result.get("close") if price_result.get("success") else None
             qty = float(pos.get("qty") or 0)
             avg = float(pos.get("avg") or 0)
