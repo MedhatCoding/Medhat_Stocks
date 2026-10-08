@@ -1139,8 +1139,11 @@ elif page == "⌕  تحليل":
         else:
             if run_analysis or autorun_analysis:
                 symbol_query = data_engine.resolve_symbol(symbol_query)
-                with st.spinner("جاري تحميل البيانات وتحليل السهم..."):
-                    result = data_engine.get_full_analysis(symbol_query)
+                if not symbol_query:
+                    result = {"success": False, "error": "اسم الشركة غير محدد أو يطابق أكثر من سهم؛ اكتب رمز التداول لتجنب تحليل سهم خاطئ."}
+                else:
+                    with st.spinner("جاري تحميل البيانات وتحليل السهم..."):
+                        result = data_engine.get_full_analysis(symbol_query)
             else:
                 result = st.session_state.get("last_analysis")
             if not result or not result.get("success"):
