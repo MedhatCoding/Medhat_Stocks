@@ -529,7 +529,7 @@ with st.container(key="bottom_nav"):
     nav_cols = st.columns(7, gap="small")
     for nav_col, (icon, label) in zip(nav_cols, NAV_ITEMS):
         with nav_col:
-            if st.button(f"{icon}\n{label}", key=f"nav_{label}", use_container_width=True):
+            if st.button(f"{icon}\n{label}", key=f"nav_{label}", use_container_width=True, type=("primary" if page == f"{icon}  {label}" else "secondary")):
                 st.session_state.mobile_page = f"{icon}  {label}"
                 st.rerun()
 
@@ -1304,50 +1304,4 @@ elif page == "⚙  الإعدادات":
         st.info("نتائج الـBacktest وسجل الأداء أدوات قياس تاريخية وليست ضمانًا للنتائج المستقبلية.")
     except Exception as exc:
         st.warning(f"تعذر قراءة سجل الأداء حاليًا: {exc}")
-
-elif page == "⚙  الإعدادات":
-    st.markdown(
-        '<div class="hero"><div class="hero-title">الإعدادات وحالة النظام</div>'
-        '<div class="hero-sub">كل الأسرار تُقرأ من Streamlit Secrets ولا يتم عرض قيمها داخل التطبيق.</div></div>',
-        unsafe_allow_html=True,
-    )
-
-    health = data_engine.health_check()
-    cols = st.columns(3)
-    for col, label, key in [
-        (cols[0], "EODHD", "eodhd_configured"),
-        (cols[1], "Gemini AI", "gemini_configured"),
-        (cols[2], "OANOR", "oanor_configured"),
-    ]:
-        with col:
-            state = "متصل" if health[key] else "غير مهيأ"
-            st.metric(label, state)
-
-    st.markdown('<div class="section">المرجعية الشرعية</div>', unsafe_allow_html=True)
-    st.write(f"المصدر: {REFERENCE_SOURCE}")
-    st.write(f"تاريخ المرجع: {REFERENCE_DATE}")
-    st.write(f"عدد الرموز المرجعية المدمجة: {len(SHARIA_SYMBOLS)}")
-    st.caption(f"هدف المنصة الحالي: {STOCK_UNIVERSE_SIZE} سهم. يمكن تحديث القائمة من الكود/Secret عند صدور نسخة أحدث.")
-
-    st.markdown('<div class="section">Telegram</div>', unsafe_allow_html=True)
-    if st.button("📨 اختبار إرسال Telegram", use_container_width=True):
-        ok, message = send_telegram("📊 <b>مدحت ستوكس AI</b>\nاختبار اتصال Telegram ناجح.")
-        if ok:
-            st.success(message)
-        else:
-            st.error(message)
-
-    st.markdown('<div class="section">ملاحظات تشغيلية</div>', unsafe_allow_html=True)
-    st.info(
-        "المحفظة وقائمة المتابعة للاستخدام الشخصي وتُحفظ في ملف personal_data.json داخل بيئة التطبيق. "
-        "لا توجد حسابات مستخدمين أو قاعدة بيانات تجارية."
-    )
-
-    st.json({
-        "version": APP_VERSION,
-        "market": "EGX",
-        "target_universe": STOCK_UNIVERSE_SIZE,
-        "reference_sharia_symbols": len(SHARIA_SYMBOLS),
-        "checked_at": health["checked_at"],
-    })
 
