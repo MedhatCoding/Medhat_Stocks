@@ -675,6 +675,18 @@ elif page == "◉  السوق":
         if missing:
             st.caption("المؤشرات التي لم يتوفر لها مصدر بيانات موثوق حاليًا: " + "، ".join(missing))
         st.caption(f"لوحة المؤشرات: {len(indices)} من {indices_board.get('expected_count', len(indices))} مؤشرات رئيسية متاحة. EGX33 Shariah ضمن اللوحة.")
+        sharia_idx=next((x for x in indices if x.get("symbol")=="EGX33"),None)
+        if sharia_idx:
+            st.markdown(
+                f'<div class="premarket"><div class="premarket-title">☪️ EGX33 Shariah • مؤشر الشريعة</div>'
+                f'<div class="premarket-time">آخر تحديث: {sharia_idx.get("date","—")}</div>'
+                f'<div class="premarket-body">القيمة: <b>{money(sharia_idx.get("close"))}</b> • '
+                f'التغير اليومي: <b>{pct(sharia_idx.get("change_pct"))}</b> • '
+                f'20 جلسة: <b>{pct(sharia_idx.get("return20"))}</b> • '
+                f'الحالة: <b>{sharia_idx.get("regime","—")}</b></div></div>',
+                unsafe_allow_html=True,
+            )
+
     else:
         st.info("لا توجد بيانات مؤشرات متاحة حاليًا. اضغط تحديث السوق لإعادة المحاولة.")
 
