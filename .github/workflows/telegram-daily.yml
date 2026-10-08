@@ -26,6 +26,9 @@ jobs:
     timeout-minutes: 10
     env:
       EODHD_API_KEY: ${{ secrets.EODHD_API_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PORTFOLIO_OWNER_ID: ${{ secrets.PORTFOLIO_OWNER_ID }}
       OANOR_API_KEY: ${{ secrets.OANOR_API_KEY }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
