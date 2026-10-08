@@ -29,45 +29,65 @@ st.set_page_config(
 )
 
 # -----------------------------
-# Personal persistence
+# Private portfolio persistence (Supabase)
 # -----------------------------
-# Personal-use only: no accounts or database.
-PERSONAL_DATA_FILE = Path(__file__).with_name("personal_data.json")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+PORTFOLIO_OWNER_ID = os.getenv("PORTFOLIO_OWNER_ID", "medhat")
 
-def load_personal_data():
+try:
+    SUPABASE_URL = str(st.secrets.get("SUPABASE_URL", SUPABASE_URL))
+    SUPABASE_KEY = str(st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", SUPABASE_KEY))
+    PORTFOLIO_OWNER_ID = str(st.secrets.get("PORTFOLIO_OWNER_ID", PORTFOLIO_OWNER_ID))
+except Exception:
+    pass
+
+def _supabase_headers():
+    return {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json"}
+
+def load_portfolio():
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return []
     try:
-        if PERSONAL_DATA_FILE.exists():
-            data = json.loads(PERSONAL_DATA_FILE.read_text(encoding="utf-8"))
-            return {
-                "watchlist": list(data.get("watchlist", [])),
-                "portfolio": list(data.get("portfolio", [])),
-            }
-    except (OSError, ValueError, TypeError):
-        pass
-    return {"watchlist": [], "portfolio": []}
+        r = requests.get(SUPABASE_URL.rstrip("/") + "/rest/v1/portfolio_positions", headers=_supabase_headers(), params={"owner_id": "eq." + PORTFOLIO_OWNER_ID, "select": "id,symbol,qty,avg", "order": "symbol.asc"}, timeout=15)
+        r.raise_for_status()
+        return [{"id": x.get("id"), "symbol": x.get("symbol"), "qty": float(x.get("qty") or 0), "avg": float(x.get("avg") or 0)} for x in r.json()]
+    except Exception as exc:
+        st.session_state["portfolio_storage_error"] = str(exc)
+        return []
+
+def upsert_portfolio_position(position):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return False, "أضف SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY مرة واحدة في Streamlit Secrets."
+    payload = {"owner_id": PORTFOLIO_OWNER_ID, "symbol": position["symbol"], "qty": float(position["qty"]), "avg": float(position["avg"])}
+    try:
+        r = requests.post(SUPABASE_URL.rstrip("/") + "/rest/v1/portfolio_positions", headers={**_supabase_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"}, params={"on_conflict": "owner_id,symbol"}, json=payload, timeout=15)
+        r.raise_for_status()
+        return True, "تم حفظ المركز"
+    except Exception as exc:
+        return False, "تعذر حفظ المحفظة: " + str(exc)
+
+def delete_portfolio_position(symbol):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return False, "قاعدة المحفظة غير مربوطة."
+    try:
+        r = requests.delete(SUPABASE_URL.rstrip("/") + "/rest/v1/portfolio_positions", headers=_supabase_headers(), params={"owner_id": "eq." + PORTFOLIO_OWNER_ID, "symbol": "eq." + symbol}, timeout=15)
+        r.raise_for_status()
+        return True, "تم حذف المركز"
+    except Exception as exc:
+        return False, "تعذر حذف المركز: " + str(exc)
 
 def save_personal_data():
-    data = {
-        "watchlist": st.session_state.get("watchlist", []),
-        "portfolio": st.session_state.get("portfolio", []),
-    }
-    try:
-        PERSONAL_DATA_FILE.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-    except OSError:
-        pass
+    return True
 
-_initial_personal_data = load_personal_data()
-
+_initial_portfolio = load_portfolio()
 # -----------------------------
 # Session state
 # -----------------------------
 if "watchlist" not in st.session_state:
     st.session_state.watchlist = _initial_personal_data["watchlist"]
 if "portfolio" not in st.session_state:
-    st.session_state.portfolio = _initial_personal_data["portfolio"]
+    st.session_state.portfolio = _initial_portfolio
 if "last_analysis" not in st.session_state:
     st.session_state.last_analysis = None
 if "last_ai" not in st.session_state:
@@ -927,10 +947,13 @@ elif page == "▣  المحفظة":
             symbol = data_engine.display_symbol(p_symbol)
             if symbol and p_qty > 0 and p_avg > 0:
                 existing = next((x for x in st.session_state.portfolio if x["symbol"] == symbol), None)
-                if existing:
-                    existing["qty"] = p_qty
-                    existing["avg"] = p_avg
+                ok, msg = upsert_portfolio_position({"symbol": symbol, "qty": p_qty, "avg": p_avg})
+                if ok:
+                    st.session_state.portfolio = load_portfolio()
+                    st.success("تم حفظ المركز وسيتم تقييمه تلقائيًا.")
                 else:
+                    st.error(msg)
+            else:
                     st.session_state.portfolio.append({"symbol": symbol, "qty": p_qty, "avg": p_avg})
                 save_personal_data()
                 st.success("تم حفظ المركز وسيتم تقييمه تلقائيًا.")
@@ -1020,84 +1043,12 @@ elif page == "▣  المحفظة":
                 unsafe_allow_html=True,
             )
             if st.button(f"✕ إزالة {advice.get('symbol')}", key=f"portfolio_remove_{advice.get('symbol')}_{i}", use_container_width=True):
-                st.session_state.portfolio.pop(i)
-                save_personal_data()
-                st.rerun()
-
-        rows = []
-        for advice, pos_tuple in zip(advisor_rows, positions):
-            pos = pos_tuple[0]
-            rows.append({
-                "الشركة / الصندوق": advice.get("name", advice.get("symbol")),
-                "الرمز": advice.get("symbol"),
-                "النوع": advice.get("asset_type"),
-                "الكمية": pos.get("qty"),
-                "متوسط الدخول": money(pos.get("avg")),
-                "السعر الحالي": money(advice.get("price")),
-                "الربح/الخسارة %": pct(advice.get("pnl_pct")) if advice.get("pnl_pct") is not None else "—",
-                "القرار": advice.get("action"),
-                "سبب القرار": advice.get("reason"),
-            })
-        frame = pd.DataFrame(rows)
-        st.dataframe(frame, use_container_width=True, hide_index=True)
-        st.download_button(
-            "⬇️ تنزيل تقرير المحفظة CSV",
-            frame.to_csv(index=False).encode("utf-8-sig"),
-            file_name="medhat_stocks_portfolio.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    else:
-        st.info("لم تضف أي مركز بعد. يمكنك إضافة سهم شرعي أو صندوق شريعة/ذهب.")
-
-
-# -----------------------------
-# Research / analysis
-# -----------------------------
-elif page == "⌕  تحليل":
-    st.markdown(
-        '<div class="hero"><div class="hero-title">البحث والتحليل</div>'
-        '<div class="hero-sub">ابحث بالرمز أو اسم الشركة. البيانات من السوق أولاً، ثم التحليل الكمي، ثم شرح AI عند الطلب.</div></div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown('<div class="search-panel">', unsafe_allow_html=True)
-    nav_symbol = st.session_state.pop("analysis_nav_symbol", None)
-    if nav_symbol:
-        st.session_state.analysis_query = nav_symbol
-    elif "analysis_query" not in st.session_state:
-        st.session_state.analysis_query = st.session_state.get("prefill_symbol", "")
-    query = st.text_input("ابحث عن السهم", key="analysis_query", placeholder="مثال: SWDY أو EGAL", label_visibility="visible")
-    suggestions = data_engine.search_symbols(query) if query else []
-    if suggestions:
-        st.caption("اقتراحات من قائمة EGX:")
-        labels = [f"{x['symbol']} — {data_engine.arabic_company_name(x['symbol'], x['name'])}" for x in suggestions[:6]]
-        picked = st.selectbox("اختر من النتائج", labels, label_visibility="collapsed")
-        selected_symbol = picked.split(" — ")[0]
-    else:
-        selected_symbol = query.strip().upper()
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        analyze = st.button("🔎  تشغيل التحليل", use_container_width=True, type="primary")
-    with c2:
-        ai_enabled = st.checkbox("تشغيل شرح Gemini", value=True)
-    with c3:
-        technical_visible = st.checkbox("إظهار التفاصيل الفنية", value=False)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    if analyze or st.session_state.get("analysis_autorun"):
-        st.session_state.analysis_autorun = False
-        st.session_state.prefill_symbol = selected_symbol or st.session_state.get("prefill_symbol", "")
-        if not selected_symbol:
-            selected_symbol = st.session_state.prefill_symbol
-        if not selected_symbol:
-            st.warning("اكتب رمز السهم أولاً.")
-        else:
-            with st.spinner("جاري جلب البيانات وتحليل آخر 365 جلسة..."):
-                result = data_engine.get_full_analysis(selected_symbol)
-            if not result["success"]:
-                st.error(friendly_error(result["error"]))
+                ok, msg = delete_portfolio_position(advice.get("symbol"))
+                if ok:
+                    st.session_state.portfolio = load_portfolio()
+                    st.rerun()
+                else:
+                    st.error(msg)
             else:
                 st.session_state.last_analysis = result
                 st.session_state.last_ai = None
