@@ -961,7 +961,10 @@ elif page == "☆  المتابعة":
         st.info("لا توجد أسهم بعد. أضف سهماً من صفحة التحليل أو الفرص.")
     else:
         for i, symbol in enumerate(list(st.session_state.watchlist)):
-            result = data_engine.get_full_analysis(symbol)
+            try:
+                result = data_engine.get_full_analysis(symbol)
+            except Exception:
+                result = {"success": False, "error": "تعذر تحديث بيانات هذا السهم الآن."}
             if result.get("success"):
                 st.markdown(
                     '<div class="m-card-grid">'
@@ -1143,7 +1146,10 @@ elif page == "⌕  تحليل":
                     result = {"success": False, "error": "اسم الشركة غير محدد أو يطابق أكثر من سهم؛ اكتب رمز التداول لتجنب تحليل سهم خاطئ."}
                 else:
                     with st.spinner("جاري تحميل البيانات وتحليل السهم..."):
+                        try:
                         result = data_engine.get_full_analysis(symbol_query)
+                    except Exception:
+                        result = {"success": False, "error": "حدث خطأ غير متوقع أثناء التحليل؛ حاول مرة أخرى بعد قليل."}
             else:
                 result = st.session_state.get("last_analysis")
             if not result or not result.get("success"):
