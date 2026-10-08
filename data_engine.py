@@ -1271,6 +1271,7 @@ class DataEngine:
         market_seasonality = _self.get_market_seasonality(min_years=3)
         seasonality_score = float(market_seasonality.get("score",50))
         rows = []
+        analyzed_count = 0
         # The screener is requested for up to 100 symbols, enough to cover
         # the full 96-name Sharia reference universe; analyze all returned matches.
         # The bounded first-20 fallback above remains in place when the screener fails.
@@ -1286,6 +1287,7 @@ class DataEngine:
                 continue
             if not analysis or not analysis.get("success"):
                 continue
+            analyzed_count += 1
 
             # Use technical/risk gates before requesting news and training ML.
             # News can add at most 8 points and ML at most 6; candidates below 41
@@ -1338,6 +1340,16 @@ class DataEngine:
             rows.append({"symbol": symbol, "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
                 "name_en": item.get("name") or symbol, "date": analysis.get("date"), "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "seasonality_score": setup.get("seasonality_score"), "defensive_bias": setup.get("defensive_bias")})
         rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
+        if analyzed_count == 0:
+            return {
+                "success": False,
+                "error": "تعذر فحص الفرص لأن مزودي البيانات لم يرجعوا تاريخًا صالحًا للأسهم الشرعية. لن نعرض صفر فرص وكأنه نتيجة تحليل مكتمل.",
+                "data": [],
+                "count": 0,
+                "market": market,
+                "sharia_universe_count": len(SHARIA_SYMBOLS),
+                "analyzed_count": 0,
+            }
         for row in rows[:max(1, min(int(limit), 40))]:
             try:
                 record_opportunity(row)
