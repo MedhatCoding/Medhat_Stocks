@@ -14,7 +14,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # The displayed Sharia universe is sourced from sharia_universe.py; keep this
 # value only as a backwards-compatible fallback for older UI code.
-STOCK_UNIVERSE_SIZE = 95
+STOCK_UNIVERSE_SIZE = 96
 OPPORTUNITY_SCORE_MIN = 0
 OPPORTUNITY_SCORE_MAX = 100
 
