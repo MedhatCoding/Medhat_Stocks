@@ -1147,9 +1147,9 @@ elif page == "⌕  تحليل":
                 else:
                     with st.spinner("جاري تحميل البيانات وتحليل السهم..."):
                         try:
-                        result = data_engine.get_full_analysis(symbol_query)
-                    except Exception:
-                        result = {"success": False, "error": "حدث خطأ غير متوقع أثناء التحليل؛ حاول مرة أخرى بعد قليل."}
+                            result = data_engine.get_full_analysis(symbol_query)
+                        except Exception:
+                            result = {"success": False, "error": "حدث خطأ غير متوقع أثناء التحليل؛ حاول مرة أخرى بعد قليل."}
             else:
                 result = st.session_state.get("last_analysis")
             if not result or not result.get("success"):
