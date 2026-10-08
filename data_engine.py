@@ -1276,8 +1276,9 @@ class DataEngine:
         # the full 96-name Sharia reference universe; analyze all returned matches.
         # The bounded first-20 fallback above remains in place when the screener fails.
         for item in candidates[:len(SHARIA_SYMBOLS)]:
-            symbol = str(item.get("code") or "").upper()
-            if symbol not in SHARIA_SYMBOLS: continue
+            symbol = _self.display_symbol(item.get("code") or "")
+            if symbol not in SHARIA_SYMBOLS:
+                continue
             # Broad-universe screening uses technicals first; detailed single-stock
             # analysis loads fundamentals on demand to conserve EODHD API calls.
             try:
