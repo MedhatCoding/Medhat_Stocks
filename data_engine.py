@@ -769,7 +769,8 @@ class DataEngine:
             return {"success": False, "error": f"استجابة AI غير متوقعة: {exc}"}
 
 
-    def get_news(self, symbol=None, limit=8):
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def get_news(_self, symbol=None, limit=8):
         limit = max(1, min(int(limit), 20))
         if self.oanor_api_key:
             query = self.display_symbol(symbol) if symbol else "Egyptian Exchange EGX stocks"
@@ -1259,7 +1260,10 @@ class DataEngine:
         market_seasonality = _self.get_market_seasonality(min_years=3)
         seasonality_score = float(market_seasonality.get("score",50))
         rows = []
-        for item in candidates[:20]:
+        # The screener is requested for up to 100 symbols, enough to cover
+        # the full 96-name Sharia reference universe; analyze all returned matches.
+        # The bounded first-20 fallback above remains in place when the screener fails.
+        for item in candidates[:len(SHARIA_SYMBOLS)]:
             symbol = str(item.get("code") or "").upper()
             if symbol not in SHARIA_SYMBOLS: continue
             analysis = _self.analyze_stock(symbol)
