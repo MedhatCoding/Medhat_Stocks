@@ -56,9 +56,9 @@ def build_portfolio_report(engine, market):
         emoji = {"زيادة":"🟢", "احتفاظ":"🟡", "بيع":"🔴"}.get(action, "⚪")
         pnl = advice.get("pnl_pct")
         pnl_text = "—" if pnl is None else f"{float(pnl):+.2f}%"
-        lines.append(f"{emoji} <b>{html.escape(str(advice.get("name") or advice.get("symbol")))}</b> ({html.escape(str(advice.get("symbol")))})")
+        lines.append(f'{emoji} <b>{html.escape(str(advice.get("name") or advice.get("symbol")))}</b> ({html.escape(str(advice.get("symbol")))})')
         lines.append(f"↳ <b>{action}</b> • ر/خ {pnl_text} • وزن {float(advice.get("weight_pct") or 0):.1f}%")
-        lines.append(f"↳ {html.escape(str(advice.get("reason") or "—"))}")
+        lines.append(f'↳ {html.escape(str(advice.get("reason") or "—"))}')
     return lines
 
 def send_telegram(token, chat_id, message):
