@@ -1292,12 +1292,13 @@ elif page == "⌕  تحليل":
                     else:
                         st.info("شرح Gemini غير مفعّل؛ أضف GEMINI_API_KEY في إعدادات النشر.")
 
-                st.markdown('<div class="section">الشارت</div>', unsafe_allow_html=True)
-                chart = result["chart"].copy()
-                chart["date"] = pd.to_datetime(chart["date"])
-                chart = chart.set_index("date")
-                chart.columns = ["الإغلاق", "SMA 20", "SMA 50", "SMA 200"]
-                st.line_chart(chart, height=390)
+                if technical_visible:
+                    st.markdown('<div class="section">الشارت</div>', unsafe_allow_html=True)
+                    chart = result["chart"].copy()
+                    chart["date"] = pd.to_datetime(chart["date"])
+                    chart = chart.set_index("date")
+                    chart.columns = ["الإغلاق", "SMA 20", "SMA 50", "SMA 200"]
+                    st.line_chart(chart, height=390)
 
                 if technical_visible:
                     st.markdown('<div class="section">التفاصيل الفنية</div>', unsafe_allow_html=True)
