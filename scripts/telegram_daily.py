@@ -65,7 +65,8 @@ def build_portfolio_report(engine, market):
         pnl = advice.get("pnl_pct")
         pnl_text = "—" if pnl is None else f"{float(pnl):+.2f}%"
         lines.append(f'{emoji} <b>{html.escape(str(advice.get("name") or advice.get("symbol")))}</b> ({html.escape(str(advice.get("symbol")))})')
-        lines.append(f"↳ <b>{action}</b> • ر/خ {pnl_text} • وزن {float(advice.get("weight_pct") or 0):.1f}%")
+        weight_pct = float(advice.get("weight_pct") or 0)
+        lines.append(f"↳ <b>{action}</b> • ر/خ {pnl_text} • وزن {weight_pct:.1f}%")
         lines.append(f'↳ {html.escape(str(advice.get("reason") or "—"))}')
     return lines
 
