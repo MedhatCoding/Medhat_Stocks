@@ -302,6 +302,8 @@ class DataEngine:
         if not raw:
             return ""
         code = self.display_symbol(raw)
+        if "." in raw and re.fullmatch(r"[A-Z0-9]{2,8}", code):
+            return code
         if code in SHARIA_SYMBOLS or code in SHARIA_FUND_MAP:
             return code
         if re.fullmatch(r"[A-Z0-9]{2,8}", raw.upper()):
