@@ -1173,7 +1173,7 @@ class DataEngine:
         daily = df.set_index("date")["close"].resample("ME").last().pct_change() * 100
         if daily.empty:
             return {"score": 50, "month": None, "avg_return": None, "samples": 0, "label": "بيانات موسمية غير كافية"}
-        from zoneinfo import ZoneInfo\n        current_month = datetime.now(ZoneInfo("Africa/Cairo")).month
+        current_month = datetime.now().month
         hist = daily[daily.index.month == current_month]
         if len(hist) < min_years:
             return {"score": 50, "month": current_month, "avg_return": None, "samples": int(len(hist)), "label": "بيانات موسمية غير كافية"}
