@@ -1050,13 +1050,22 @@ elif page == "⌕  تحليل":
                         f'<div class="premarket"><div class="premarket-title">احتمال تاريخي محسوب بالنموذج</div>'
                         f'<div class="premarket-body">احتمال تحقق سيناريو +{ml.get("target_pct",3)}% خلال {ml.get("horizon_days",10)} جلسات قبل وقف {ml.get("stop_pct",4)}%: '
                         f'<b>{ml.get("probability","—")}%</b><br>'
-                        f'عينات التدريب: <b>{ml.get("samples","—")}</b> • دقة اختبار تاريخي: <b>{ml.get("validation_accuracy","—")}%</b></div></div>',
+                        f'عينات التدريب: <b>{ml.get("samples","—")}</b> • دقة الاختبار: <b>{ml.get("validation_accuracy","—")}%</b><br>'
+                        f'Logistic: <b>{ml.get("logistic_probability","—")}%</b> • Deep Learning: <b>{ml.get("deep_learning_probability","—")}%</b> • '
+                        f'العينة المغلقة من التوصيات: <b>{ml.get("feedback_samples","—")}</b></div></div>',
                         unsafe_allow_html=True,
                     )
 
                 if result.get("sharia_fund"):
                     fi = result.get("fund_info", {})
                     st.info(f'📊 صندوق مؤشر الشريعة EGX33 — {fi.get("name","")} • المرجع: {fi.get("benchmark","EGX33 Shariah")}')
+                gold_funds = result.get("gold_funds") or []
+                if gold_funds:
+                    st.markdown('<div class="section">🪙 البديل الدفاعي: صناديق الذهب</div>', unsafe_allow_html=True)
+                    gf = pd.DataFrame([{"الرمز":f.get("symbol"),"الصندوق":f.get("name"),"الإدارة":f.get("manager"),
+                                        "المرجعية الشرعية":"مؤكدة" if f.get("sharia_compliant") else "غير مؤكدة"} for f in gold_funds])
+                    st.dataframe(gf, use_container_width=True, hide_index=True)
+                    st.caption("يُستخدم الذهب كأداة تحوط/تنويع عند ضعف السوق؛ لا يتم اعتباره فرصة سهم EGX ولا تُخلط درجته مع درجة السهم.")
                 season = result.get("seasonality") or {}
                 if season:
                     st.markdown(
