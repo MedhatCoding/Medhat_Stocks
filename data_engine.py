@@ -509,7 +509,7 @@ class DataEngine:
         return frame
 
     @st.cache_data(ttl=900, show_spinner=False)
-    def analyze_stock(_self, symbol):
+    def analyze_stock(_self, symbol, include_fundamentals=True):
         history = _self.get_stock_history(symbol, days=500)
         if not history["success"] or not history["data"]:
             return {"success": False, "error": history.get("error", "لا توجد بيانات")}
@@ -600,7 +600,7 @@ class DataEngine:
 
         # Fundamental quality, when available, is deliberately a bonus rather
         # than a hard requirement because some EGX names have incomplete data.
-        fundamentals = _self.get_company_snapshot(symbol)
+        fundamentals = _self.get_company_snapshot(symbol) if include_fundamentals else {"success": False}
         fundamental_score = None
         if fundamentals.get("success"):
             f = fundamentals
@@ -1266,7 +1266,9 @@ class DataEngine:
         for item in candidates[:len(SHARIA_SYMBOLS)]:
             symbol = str(item.get("code") or "").upper()
             if symbol not in SHARIA_SYMBOLS: continue
-            analysis = _self.analyze_stock(symbol)
+            # Broad-universe screening uses technicals first; detailed single-stock
+            # analysis loads fundamentals on demand to conserve EODHD API calls.
+            analysis = _self.analyze_stock(symbol, include_fundamentals=False)
             if not analysis.get("success"):
                 continue
 
