@@ -520,8 +520,8 @@ def value_class(value):
 def app_card(label, value, note="", tone="flat"):
     # Escape provider-supplied values before rendering HTML.
     label_html = html.escape(str(label))
-    value_html = html.escape(str(value))
-    note_html = html.escape(str(note))
+    value_html = html.escape("—" if value is None else str(value))
+    note_html = html.escape("" if note is None else str(note))
     tone_html = html.escape(str(tone), quote=True)
     return (
         f'<div class="m-card"><div class="m-label">{label_html}</div>'
@@ -1085,12 +1085,12 @@ elif page == "▣  المحفظة":
             st.markdown(
                 f'<div class="app-card" style="margin-bottom:10px;">'
                 f'<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">'
-                f'<div><b>{advice.get("name", advice.get("symbol"))}</b>'
-                f'<div style="opacity:.7;font-size:.85rem;">{advice.get("symbol")} • {advice.get("asset_type","")}</div></div>'
+                f'<div><b>{html.escape(str(advice.get("name") or advice.get("symbol") or "—"))}</b>'
+                f'<div style="opacity:.7;font-size:.85rem;">{html.escape(str(advice.get("symbol") or "—"))} • {html.escape(str(advice.get("asset_type") or ""))}</div></div>'
                 f'<div style="font-size:1.05rem;font-weight:800;">{badge}</div></div>'
                 f'<div style="margin-top:8px;">السعر: <b>{money(advice.get("price"))}</b> &nbsp; | &nbsp; '
                 f'ربح/خسارة: <b>{pnl_text}</b> &nbsp; | &nbsp; التقييم: <b>{score_text}</b> &nbsp; | &nbsp; المخاطر: <b>{risk_text}</b></div>'
-                f'<div style="margin-top:7px;opacity:.85;">{advice.get("reason","")}</div>'
+                f'<div style="margin-top:7px;opacity:.85;">{html.escape(str(advice.get("reason") or ""))}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
