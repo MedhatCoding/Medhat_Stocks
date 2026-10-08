@@ -9,8 +9,12 @@ import streamlit as st
 
 from data_engine import data_engine
 from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE, is_sharia_reference
-from config import APP_NAME, APP_VERSION
+from config import APP_NAME, APP_VERSION, SHOW_TECHNICAL_DEFAULT
 from portfolio_advisor import advise as portfolio_advise, asset_info as portfolio_asset_info
+
+# Feature flags must be initialized before any page renders.
+ai_enabled = bool(data_engine.gemini_api_key)
+technical_visible = bool(SHOW_TECHNICAL_DEFAULT)
 
 # Optional live override: put SHARIA_SYMBOLS = "AAA,BBB,CCC" in Streamlit Secrets.
 try:
@@ -530,7 +534,7 @@ def price_card(label, price, change=None, note=""):
 
 def company_display_name(result, fallback="الشركة"):
     fundamentals = result.get("fundamentals") or {}
-    name = fundamentals.get("name")
+    name = fundamentals.get("name") or result.get("name")
     if name and str(name).strip():
         return str(name).strip()
     return fallback
