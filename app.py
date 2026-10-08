@@ -719,7 +719,7 @@ elif page == "◉  السوق":
     st.markdown(
         '<div class="m-card-grid">'
         f'{app_card("أسهم بأسعار متاحة", available_quotes, f"من {len(SHARIA_SYMBOLS)} سهمًا في المرجع الشرعي")}'
-        f'{app_card("مؤشرات متاحة", available_indices, f"من {indices_board.get("expected_count", 0)} مؤشرات")}'
+        f'{app_card("مؤشرات متاحة", available_indices, "من " + str(indices_board.get("expected_count", 0)) + " مؤشرات")}'
         '</div>',
         unsafe_allow_html=True,
     )
