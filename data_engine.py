@@ -846,7 +846,11 @@ class DataEngine:
                             "date": row.get("date") or row.get("timestamp"),
                             "close": close,
                             "sma20": None, "sma50": None,
-                            "change_pct": _self._num(row.get("change_percent") or row.get("change_pct") or row.get("changePercent")),
+                            "change_pct": _self._num(
+                                row.get("change_percent") if row.get("change_percent") is not None
+                                else row.get("change_pct") if row.get("change_pct") is not None
+                                else row.get("changePercent")
+                            ),
                             "return20": None,
                             "regime": "بيانات EGX30 الحالية متاحة", "provider": "OANOR",
                         }
