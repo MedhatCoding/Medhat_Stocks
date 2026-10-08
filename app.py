@@ -1041,7 +1041,13 @@ elif page == "▣  المحفظة":
         advisor_rows = []
         for i, (pos, price, value) in enumerate(positions):
             try:
-                analysis = data_engine.analyze_stock(pos["symbol"])
+                asset = portfolio_asset_info(pos["symbol"])
+                if asset.get("asset_type") in ("صندوق مؤشر", "صندوق ذهب"):
+                    # Fund advice uses the fund quote and benchmark regime; do not
+                    # waste an equity-history request on a fund ticker.
+                    analysis = None
+                else:
+                    analysis = data_engine.analyze_stock(pos["symbol"])
             except Exception as exc:
                 analysis = {"success": False, "error": str(exc)}
             advice = portfolio_advise(
