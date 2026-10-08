@@ -154,9 +154,6 @@ def backtest(history_loader, symbols, horizon=10, min_score=60):
     hit rate, and exposure so the strategy can be compared with a benchmark.
     """
     results = []
-    equity = 1.0
-    peak = 1.0
-    max_dd = 0.0
     for symbol in symbols:
         history = history_loader(symbol, days=1200)
         if not history.get("success"):
@@ -205,28 +202,36 @@ def backtest(history_loader, symbols, horizon=10, min_score=60):
             target = close + atr
             stop = close - 1.2 * atr
             future = frame.iloc[i+1:i+horizon+1]
-            ht = bool((future["high"] >= target).any())
-            hs = bool((future["low"] <= stop).any())
-            # Daily OHLC cannot establish intraday barrier order; if both are
-            # touched in the same horizon, stop-first is the conservative assumption.
-            if hs:
-                ret = (stop/close-1)*100
-                outcome="loss"
-            elif ht:
-                ret = (target/close-1)*100
-                outcome="win"
-            else:
-                ret = (float(future.iloc[-1]["close"])/close-1)*100
-                outcome="expired"
+            # Resolve barriers in chronological order. If both the target and
+            # stop are touched in one daily candle, conservatively assume stop first.
+            outcome = "expired"
+            ret = (float(future.iloc[-1]["close"])/close-1)*100
+            for candle in future.itertuples(index=False):
+                candle_low = getattr(candle, "low", None)
+                candle_high = getattr(candle, "high", None)
+                if pd.notna(candle_low) and float(candle_low) <= stop:
+                    ret = (stop/close-1)*100
+                    outcome = "loss"
+                    break
+                if pd.notna(candle_high) and float(candle_high) >= target:
+                    ret = (target/close-1)*100
+                    outcome = "win"
+                    break
             results.append({"symbol":symbol,"date":str(frame.iloc[i]["date"]),
                             "score":score,"return_pct":ret,"outcome":outcome})
-            equity *= 1 + ret/100 * 0.25
-            peak=max(peak,equity)
-            max_dd=max(max_dd,(peak-equity)/peak*100)
 
     if not results:
         return {"success":False,"reason":"لا توجد بيانات كافية للـWalk-forward Backtest"}
-    df=pd.DataFrame(results)
+    df = pd.DataFrame(results).sort_values("date").reset_index(drop=True)
+    # Approximate a chronological equal-weight daily equity curve rather than
+    # compounding trades in symbol-loop order (which distorts drawdown).
+    equity = 1.0
+    peak = 1.0
+    max_dd = 0.0
+    for daily_return in df.groupby("date")["return_pct"].mean():
+        equity *= 1 + float(daily_return) / 100 * 0.25
+        peak = max(peak, equity)
+        max_dd = max(max_dd, (peak - equity) / peak * 100)
     wins=int((df.outcome=="win").sum())
     losses=int((df.outcome=="loss").sum())
     positive=df.loc[df.return_pct>0,"return_pct"].sum()
