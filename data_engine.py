@@ -1253,7 +1253,8 @@ class DataEngine:
                 continue
             if setup["rebound_score"] < 45:
                 continue
-            if float(analysis.get("risk_score") or 100) > 65:
+            risk_value = _self._num(analysis.get("risk_score"))
+            if risk_value is None or risk_value > 65:
                 continue
             rows.append({"symbol": symbol, "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
                 "name_en": item.get("name") or symbol, "date": analysis.get("date"), "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "seasonality_score": setup.get("seasonality_score"), "defensive_bias": setup.get("defensive_bias")})
