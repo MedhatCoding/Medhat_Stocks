@@ -121,15 +121,24 @@ def advise(position, analysis=None, market=None, portfolio_value=0.0):
     if weight >= 30:
         reasons.append("وزن المركز كبير نسبيًا")
 
-    if risk is not None and risk >= 78:
+    hard_blocks = analysis.get("hard_blocks") or []
+    confidence = _num(analysis.get("confidence"))
+    # Risk controls override bullish scores.
+    if risk is not None and risk >= 82:
         action, key = "بيع", "sell"
-    elif decision_score >= 70 and combined_prob >= 0.60 and (risk is None or risk < 55) and weight < 30:
+    elif hard_blocks and ("اتجاه هابط قوي" in hard_blocks or "سيولة ضعيفة جدًا" in hard_blocks):
+        action, key = "بيع", "sell"
+    elif hard_blocks:
+        action, key = "احتفاظ", "hold"
+    elif decision_score >= 72 and combined_prob >= 0.62 and (confidence is None or confidence >= 68) and (risk is None or risk < 55) and weight < 25:
         action, key = "زيادة", "increase"
-    elif decision_score < 43 or (combined_prob < 0.35 and risk is not None and risk >= 60):
+    elif decision_score < 42 or (combined_prob < 0.35 and risk is not None and risk >= 60):
         action, key = "بيع", "sell"
     else:
         action, key = "احتفاظ", "hold"
 
+    if hard_blocks:
+        reasons.append("فلتر أمان: " + "، ".join(hard_blocks[:2]))
     if not reasons:
         reasons.append("الإشارات الحالية متوازنة")
 
@@ -137,5 +146,5 @@ def advise(position, analysis=None, market=None, portfolio_value=0.0):
         "action": action, "action_key": key, "reason": " • ".join(reasons[:3]),
         "symbol": symbol, "name": info["name"], "asset_type": info["asset_type"],
         "price": price, "pnl_pct": pnl_pct, "score": round(decision_score, 1),
-        "risk": risk, "ml_probability": combined_prob, "weight_pct": weight,
+        "risk": risk, "ml_probability": combined_prob, "confidence": confidence, "weight_pct": weight, "hard_blocks": hard_blocks,
     }
