@@ -102,17 +102,25 @@ def train_and_predict(frame,horizon=10,target_pct=3.0,stop_pct=4.0,feedback=None
     fit,val=idx[:split],idx[split:]
     mu=x.iloc[fit].mean(); sd=x.iloc[fit].std().replace(0,1).fillna(1)
     X=((x-mu)/sd).to_numpy(float); Y=y.to_numpy(float).reshape(-1)
-    logit=_fit_logistic(X[fit],Y[fit])
-    mlp=_fit_mlp(X[fit],Y[fit])
+    logit = _fit_logistic(X[fit], Y[fit])
+    # ML failures must never take down the whole pre-market report.
+    mlp_error = None
+    try:
+        mlp = _fit_mlp(X[fit], Y[fit])
+    except (ValueError, FloatingPointError, IndexError) as exc:
+        mlp_error = type(exc).__name__
+        mlp = None
     latest=len(frame)-1
     if not x.iloc[latest].notna().all():
         return {"success":False,"reason":"بيانات أحدث جلسة غير مكتملة للنماذج"}
-    p1=float(logit(X[[latest]])[0]); p2=float(mlp(X[[latest]])[0])
-    ensemble=(p1*0.45+p2*0.55)*100
+    p1 = float(logit(X[[latest]])[0])
+    p2 = float(mlp(X[[latest]])[0]) if mlp is not None else p1
+    ensemble = (p1 * 0.45 + p2 * 0.55) * 100 if mlp is not None else p1 * 100
     acc_log=acc_mlp=None
     if len(val)>=8:
         acc_log=float(np.mean((logit(X[val])>=0.5)==Y[val]))
-        acc_mlp=float(np.mean((mlp(X[val])>=0.5)==Y[val]))
+        if mlp is not None:
+            acc_mlp=float(np.mean((mlp(X[val])>=0.5)==Y[val]))
     return {
         "success":True,"probability":round(ensemble,1),
         "logistic_probability":round(p1*100,1),"deep_learning_probability":round(p2*100,1),
@@ -121,6 +129,7 @@ def train_and_predict(frame,horizon=10,target_pct=3.0,stop_pct=4.0,feedback=None
         "logistic_accuracy":round(acc_log*100,1) if acc_log is not None else None,
         "deep_learning_accuracy":round(acc_mlp*100,1) if acc_mlp is not None else None,
         "target_pct":target_pct,"stop_pct":stop_pct,"horizon_days":horizon,
-        "method":"Ensemble: logistic regression + 3-hidden-layer neural network + walk-forward feedback",
+        "method":"Ensemble: logistic regression + 3-hidden-layer neural network + walk-forward feedback" if mlp is not None else "Logistic fallback (neural network unavailable)",
+        "mlp_fallback_reason": mlp_error,
         "feedback_samples":sum(1 for r in (feedback or []) if r.get("outcome") in ("target1","target2","stop")),
     }
