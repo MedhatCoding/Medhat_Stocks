@@ -566,7 +566,7 @@ with st.container(key="bottom_nav"):
     nav_cols = st.columns(7, gap="small")
     for nav_col, (icon, label) in zip(nav_cols, NAV_ITEMS):
         with nav_col:
-            if st.button(f"{icon}\n{label}", key=f"nav_{label}", use_container_width=True, type=("primary" if page == f"{icon}  {label}" else "secondary")):
+            if st.button(f"{icon}\n{label}", key=f"nav_{label}", use_container_width=True, type=("primary" if current_page == f"{icon}  {label}" else "secondary")):
                 st.session_state.mobile_page = f"{icon}  {label}"
                 st.rerun()
 
