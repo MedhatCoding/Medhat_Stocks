@@ -1336,10 +1336,16 @@ class DataEngine:
         return {"success":True,"funds":GOLD_FUNDS,"count":len(GOLD_FUNDS)}
 
     def get_asset_allocation_context(self):
-        market=self.get_market_context()
-        season=self.get_market_seasonality(min_years=3)
-        return {"market_regime":market.get("regime","غير متاح"),
-                "seasonality":season,"sharia_funds":SHARIA_INDEX_FUNDS,"gold_funds":GOLD_FUNDS}
+        market = self.get_market_context()
+        season = self.get_market_seasonality(min_years=3)
+        return {
+            "market": market,
+            "market_regime": market.get("regime", "غير متاح"),
+            "seasonality": season,
+            "seasonality_score": season.get("score"),
+            "sharia_funds": SHARIA_INDEX_FUNDS,
+            "gold_funds": GOLD_FUNDS,
+        }
 
     def get_full_analysis(self, symbol):
         technical = self.analyze_stock(symbol)
