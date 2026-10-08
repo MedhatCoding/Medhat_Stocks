@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from data_engine import DataEngine
+from recommendation_journal import evaluate_open, record_opportunity
 
 TZ = ZoneInfo("Africa/Cairo")
 SEND_HOUR = 9
@@ -67,6 +68,11 @@ def main():
         and float(row.get("risk_score") or 100) <= MAX_RISK
     ]
     rows.sort(key=lambda row: float(row.get("opportunity_score") or 0), reverse=True)
+
+    # Close matured recommendations first, then journal today's qualifying setups.
+    evaluate_open(lambda symbol, days: engine.get_stock_history(symbol, days=max(30, days)))
+    for row in rows[:12]:
+        record_opportunity(row)
 
     lines = [
         "📊 <b>مدحت ستوكس — تقرير صباح السوق</b>",
