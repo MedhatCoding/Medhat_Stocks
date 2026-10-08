@@ -509,7 +509,7 @@ class DataEngine:
         return frame
 
     @st.cache_data(ttl=900, show_spinner=False)
-    def analyze_stock(_self, symbol, include_fundamentals=True):
+    def analyze_stock(_self, symbol, include_fundamentals=True, include_ml=True):
         history = _self.get_stock_history(symbol, days=500)
         if not history["success"] or not history["data"]:
             return {"success": False, "error": history.get("error", "لا توجد بيانات")}
@@ -641,8 +641,14 @@ class DataEngine:
         else:
             status = "محايد"
 
-        ml = train_and_predict(frame, feedback=adaptive_feedback())
-        ml_prob = _self._num((ml or {}).get("probability"))
+        if include_ml:
+            try:
+                ml = train_and_predict(frame, feedback=adaptive_feedback())
+            except Exception:
+                ml = {"success": False, "reason": "تعذر تدريب النموذج لهذه العينة"}
+        else:
+            ml = {"success": False, "reason": "تم تأجيل تدريب النموذج إلى المرشحين الأقرب للتأهل"}
+        ml_prob = _self._num((ml or {}).get("probability")) if (ml or {}).get("success") else None
         confidence = None
         if ml_prob is not None:
             confidence = round(max(0, min(100, 0.55 * opportunity_score + 0.45 * ml_prob)), 1)
@@ -1263,21 +1269,22 @@ class DataEngine:
             # Broad-universe screening uses technicals first; detailed single-stock
             # analysis loads fundamentals on demand to conserve EODHD API calls.
             try:
-                analysis = _self.analyze_stock(symbol, include_fundamentals=False)
+                analysis = _self.analyze_stock(symbol, include_fundamentals=False, include_ml=False)
             except Exception:
                 # A malformed quote/history for one company must not stop the full scan.
                 continue
             if not analysis or not analysis.get("success"):
                 continue
 
-            # Use technical/risk gates before requesting news. News can adjust the
-            # score by at most 8 points, so candidates below 47 cannot qualify at 55.
+            # Use technical/risk gates before requesting news and training ML.
+            # News can add at most 8 points and ML at most 6; candidates below 41
+            # cannot reach the qualification threshold of 55.
             try:
                 preliminary = _self._opportunity_setup(analysis, market, None, seasonality_score)
             except (TypeError, ValueError, KeyError):
                 continue
             risk_value = _self._num(analysis.get("risk_score"))
-            if preliminary["hard_blocks"] or preliminary["final_opportunity_score"] < 47:
+            if preliminary["hard_blocks"] or preliminary["final_opportunity_score"] < 41:
                 continue
             if preliminary["rebound_score"] < 45 or risk_value is None or risk_value > 65:
                 continue
@@ -1290,6 +1297,24 @@ class DataEngine:
             polarities = [_self._num(x.get("polarity")) for x in news_rows]
             polarities = [x for x in polarities if x is not None]
             news_score = (sum(polarities) / len(polarities)) if polarities else None
+
+            # Train ML only for candidates that survived technical, risk and rebound
+            # gates; the cached history prevents an extra EODHD history request.
+            try:
+                history = _self.get_stock_history(symbol, days=500)
+                if history.get("success") and history.get("data"):
+                    ml = train_and_predict(_self._series(history["data"]), feedback=adaptive_feedback())
+                else:
+                    ml = {"success": False, "reason": "البيانات التاريخية غير كافية"}
+            except Exception:
+                ml = {"success": False, "reason": "تعذر تدريب النموذج لهذه العينة"}
+            analysis["ml"] = ml
+            ml_probability = _self._num(ml.get("probability")) if ml.get("success") else None
+            if ml_probability is not None:
+                analysis["confidence"] = round(max(0, min(100,
+                    0.55 * float(analysis.get("opportunity_score") or 50) + 0.45 * ml_probability
+                )), 1)
+
             setup = _self._opportunity_setup(analysis, market, news_score, seasonality_score)
             # Keep the opportunities screen limited to qualified setups; do not
             # display blocked or high-risk candidates as actionable opportunities.
