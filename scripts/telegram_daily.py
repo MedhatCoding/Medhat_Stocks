@@ -112,7 +112,9 @@ def main():
         )
 
     indices_board = engine.get_market_indices()
-    market = report.get("market", {})
+    market = dict(report.get("market", {}) or {})
+    seasonality = engine.get_market_seasonality(min_years=3)
+    market["seasonality_score"] = seasonality.get("score")
 
     rows = [
         row for row in report.get("opportunities", [])
