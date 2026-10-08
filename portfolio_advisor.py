@@ -38,6 +38,33 @@ def advise(position, analysis=None, market=None, portfolio_value=0.0):
     if analysis is None:
         analysis = data_engine.analyze_stock(symbol)
 
+    if info.get("asset_type") in ("صندوق مؤشر", "صندوق ذهب"):
+        quote = data_engine.get_latest_price(symbol)
+        price = _num(quote.get("close")) if quote.get("success") else None
+        pnl_pct = ((price / avg) - 1) * 100 if price is not None and avg > 0 else None
+        if not quote.get("success"):
+            return {
+                "action": "بيانات غير كافية", "action_key": "insufficient",
+                "reason": "تعذر جلب السعر الحالي للصندوق؛ لن يتم اختلاق توصية.",
+                "symbol": symbol, "name": info["name"], "asset_type": info["asset_type"],
+                "price": None, "pnl_pct": pnl_pct, "score": None, "risk": None,
+            }
+        regime = (market or {}).get("regime", "")
+        if info.get("asset_type") == "صندوق مؤشر" and regime == "إيجابي":
+            action, key, reason = "زيادة", "increase", "الصندوق يتتبع EGX33 الشريعة وحالة السوق العامة إيجابية."
+        elif info.get("asset_type") == "صندوق مؤشر" and regime == "ضعيف":
+            action, key, reason = "احتفاظ", "hold", "حالة السوق ضعيفة؛ لا توجد أفضلية لزيادة التعرض الآن."
+        elif info.get("asset_type") == "صندوق مؤشر":
+            action, key, reason = "احتفاظ", "hold", "حالة السوق متذبذبة؛ الاحتفاظ أفضل من مطاردة الحركة."
+        else:
+            action, key, reason = "احتفاظ", "hold", "الصندوق دفاعي، ولا توجد إشارة سعرية موثوقة كافية للبيع أو الزيادة."
+        return {
+            "action": action, "action_key": key, "reason": reason,
+            "symbol": symbol, "name": info["name"], "asset_type": info["asset_type"],
+            "price": price, "pnl_pct": pnl_pct, "score": None, "risk": None,
+            "ml_probability": None, "weight_pct": 0.0,
+        }
+
     if not analysis or not analysis.get("success"):
         return {
             "action": "بيانات غير كافية", "action_key": "insufficient",
@@ -55,7 +82,7 @@ def advise(position, analysis=None, market=None, portfolio_value=0.0):
     ml = analysis.get("ml") or {}
     ml_prob = _num(ml.get("probability"))
     deep_prob = _num(ml.get("deep_learning_probability"))
-    combined_prob = ((ml_prob if ml_prob is not None else 0.5) + (deep_prob if deep_prob is not None else (ml_prob if ml_prob is not None else 0.5))) / 2
+    ml_prob = 50.0 if ml_prob is None else ml_prob\n    deep_prob = ml_prob if deep_prob is None else deep_prob\n    if ml_prob > 1: ml_prob /= 100.0\n    if deep_prob > 1: deep_prob /= 100.0\n    combined_prob = (ml_prob + deep_prob) / 2
 
     regime = (market or {}).get("regime", "")
     seasonality = _num((market or {}).get("seasonality_score"))
