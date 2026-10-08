@@ -350,14 +350,34 @@ class DataEngine:
         return {"success": True, "symbol": normalized, "data": data if isinstance(data, dict) else {}}
 
     def get_latest_price(self, symbol):
-        result = self.get_stock_history(symbol, days=5)
-        if not result["success"] or not result["data"]:
-            return {
-                "success": False,
-                "symbol": self.normalize_symbol(symbol),
-                "price": None,
-                "error": result.get("error", "لا توجد بيانات"),
-            }
+        """Return the freshest available EGX quote, preferring OANOR."""
+        normalized = self.normalize_symbol(symbol)
+        if not normalized:
+            return {"success": False, "symbol": "", "price": None, "error": "رمز السهم غير صالح"}
+
+        live = self.get_live_quote(normalized)
+        if live.get("success"):
+            row = live.get("data") or {}
+            close = self._num(row.get("price") or row.get("close") or row.get("last"))
+            previous = self._num(
+                row.get("previous_close") or row.get("prev_close") or
+                row.get("previousClose") or row.get("prevClose")
+            )
+            change_pct = self._num(row.get("change_percent") or row.get("change_pct") or row.get("changePercent"))
+            if close is not None:
+                if change_pct is None and previous not in (None, 0):
+                    change_pct = (close / previous - 1) * 100
+                return {
+                    "success": True, "symbol": normalized, "date": row.get("date") or row.get("timestamp"),
+                    "open": row.get("open"), "high": row.get("high"), "low": row.get("low"),
+                    "close": close, "price": close, "volume": row.get("volume"),
+                    "previous_close": previous, "change_pct": change_pct, "provider": "OANOR",
+                }
+
+        result = self.get_stock_history(normalized, days=5)
+        if not result.get("success") or not result.get("data"):
+            return {"success": False, "symbol": normalized, "price": None,
+                    "error": result.get("error", "لا توجد بيانات")}
         row = result["data"][0]
         previous = result["data"][1] if len(result["data"]) > 1 else {}
         close = self._num(row.get("close"))
@@ -365,17 +385,11 @@ class DataEngine:
         change = close - prev_close if close is not None and prev_close is not None else None
         change_pct = (change / prev_close * 100) if change is not None and prev_close else None
         return {
-            "success": True,
-            "symbol": result["symbol"],
-            "date": row.get("date"),
-            "open": row.get("open"),
-            "high": row.get("high"),
-            "low": row.get("low"),
-            "close": row.get("close"),
-            "volume": row.get("volume"),
-            "previous_close": previous.get("close"),
-            "change": change,
-            "change_pct": change_pct,
+            "success": True, "symbol": result["symbol"], "date": row.get("date"),
+            "open": row.get("open"), "high": row.get("high"), "low": row.get("low"),
+            "close": close, "price": close, "volume": row.get("volume"),
+            "previous_close": prev_close, "change": change, "change_pct": change_pct,
+            "provider": result.get("provider", "historical"),
         }
 
     @staticmethod
@@ -686,7 +700,7 @@ class DataEngine:
             idx = self._oanor_get("egx-api/v1/index", timeout=15)
             if idx.get("success"):
                 payload = idx.get("data") or {}
-                row = payload.get("data") if isinstance(payload, dict) else payload
+                row = (payload.get("data") or payload.get("index") or payload.get("indices")) if isinstance(payload, dict) else payload
                 if isinstance(row, list):
                     row = row[0] if row else {}
                 if isinstance(row, dict):
@@ -962,7 +976,7 @@ class DataEngine:
         filters = [["exchange", "=", _self.EGX_EXCHANGE], ["code", "in", SHARIA_SYMBOLS], ["refund_5d_p", "<", 0]]
         screen = _self._get("screener", {"filters": json.dumps(filters, ensure_ascii=False), "sort": "refund_5d_p.asc", "limit": 100}, timeout=40)
         candidates = (screen.get("data") or {}).get("data", []) if screen.get("success") else []
-        if not candidates: candidates = [{"code": s} for s in SHARIA_SYMBOLS]
+        if not candidates:\n            # Protect API quotas if Screener is unavailable.\n            candidates = [{"code": s} for s in SHARIA_SYMBOLS[:20]]
         # Close older recommendations first so the next ML run can learn from real outcomes.
         try:
             from recommendation_journal import evaluate_open
@@ -973,7 +987,7 @@ class DataEngine:
         market_seasonality = _self.get_market_seasonality(min_years=3)
         seasonality_score = float(market_seasonality.get("score",50))
         rows = []
-        for item in candidates[:len(SHARIA_SYMBOLS)]:
+        for item in candidates[:20]:
             symbol = str(item.get("code") or "").upper()
             if symbol not in SHARIA_SYMBOLS: continue
             analysis = _self.analyze_stock(symbol)
