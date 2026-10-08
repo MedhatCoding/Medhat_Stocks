@@ -74,7 +74,11 @@ def evaluate_open(history_loader, horizon=10):
     for row in rows:
         if row.get("status") != "open":
             continue
-        history = history_loader(row["symbol"], days=max(30, horizon + 5))
+        try:
+            history = history_loader(row["symbol"], days=max(30, horizon + 5))
+        except Exception:
+            # One failed symbol must not prevent other recommendations from closing.
+            continue
         data = history.get("data", []) if history.get("success") else []
         if not data:
             continue
@@ -83,8 +87,8 @@ def evaluate_open(history_loader, horizon=10):
             continue
         frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
         frame["close"] = pd.to_numeric(frame["close"], errors="coerce")
-        frame["high"] = pd.to_numeric(frame.get("high"), errors="coerce")
-        frame["low"] = pd.to_numeric(frame.get("low"), errors="coerce")
+        frame["high"] = pd.to_numeric(frame["high"], errors="coerce") if "high" in frame else pd.Series(index=frame.index, dtype=float)
+        frame["low"] = pd.to_numeric(frame["low"], errors="coerce") if "low" in frame else pd.Series(index=frame.index, dtype=float)
         frame = frame.dropna(subset=["date", "close"]).sort_values("date")
         start = pd.to_datetime(row.get("date"), errors="coerce")
         if pd.isna(start):
@@ -96,18 +100,28 @@ def evaluate_open(history_loader, horizon=10):
         target1 = float(row.get("target1") or 0)
         target2 = float(row.get("target2") or 0)
         stop = float(row.get("stop") or 0)
-        hit_t2 = bool((future["high"] >= target2).any()) if target2 else False
-        hit_t1 = bool((future["high"] >= target1).any()) if target1 else False
-        hit_stop = bool((future["low"] <= stop).any()) if stop else False
-        end_close = float(future.iloc[-1]["close"])
-        if hit_stop and not hit_t1:
-            outcome, ret = "stop", (stop / entry - 1) * 100 if entry else 0
-        elif hit_t2:
-            outcome, ret = "target2", (target2 / entry - 1) * 100 if entry else 0
-        elif hit_t1:
-            outcome, ret = "target1", (target1 / entry - 1) * 100 if entry else 0
-        else:
-            outcome, ret = "expired", (end_close / entry - 1) * 100 if entry else 0
+        if entry <= 0:
+            continue
+
+        # Evaluate the first barrier reached in chronological order. If a single
+        # daily candle touches both a target and the stop, assume the stop happened
+        # first; daily OHLC data cannot prove the intraday order.
+        outcome, ret = "expired", None
+        for candle in future.itertuples(index=False):
+            candle_high = getattr(candle, "high", None)
+            candle_low = getattr(candle, "low", None)
+            if pd.notna(candle_low) and stop > 0 and float(candle_low) <= stop:
+                outcome, ret = "stop", (stop / entry - 1) * 100
+                break
+            if pd.notna(candle_high) and target2 > 0 and float(candle_high) >= target2:
+                outcome, ret = "target2", (target2 / entry - 1) * 100
+                break
+            if pd.notna(candle_high) and target1 > 0 and float(candle_high) >= target1:
+                outcome, ret = "target1", (target1 / entry - 1) * 100
+                break
+        if ret is None:
+            end_close = float(future.iloc[-1]["close"])
+            ret = (end_close / entry - 1) * 100
         row.update({"status": "closed", "outcome": outcome,
                     "outcome_return_pct": round(ret, 2), "closed_at": now})
         changed += 1
@@ -193,10 +207,12 @@ def backtest(history_loader, symbols, horizon=10, min_score=60):
             future = frame.iloc[i+1:i+horizon+1]
             ht = bool((future["high"] >= target).any())
             hs = bool((future["low"] <= stop).any())
-            if hs and not ht:
+            # Daily OHLC cannot establish intraday barrier order; if both are
+            # touched in the same horizon, stop-first is the conservative assumption.
+            if hs:
                 ret = (stop/close-1)*100
                 outcome="loss"
-            elif ht and not hs:
+            elif ht:
                 ret = (target/close-1)*100
                 outcome="win"
             else:
