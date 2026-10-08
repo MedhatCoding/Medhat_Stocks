@@ -1,9 +1,17 @@
 import html
 import os
+import sys
+from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import requests
+
+# The script lives in scripts/, while the application modules live at repo root.
+# Add the repository root to Python's import path for GitHub Actions and local runs.
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from data_engine import DataEngine
 from recommendation_journal import evaluate_open, record_opportunity
