@@ -516,6 +516,7 @@ def app_action(icon, title, subtitle):
 # App navigation
 # -----------------------------
 # Real app navigation: seven actual buttons in a fixed bottom dock on mobile.
+current_page = st.session_state.mobile_page
 NAV_ITEMS = [
     ("⌂", "الرئيسية"),
     ("◉", "السوق"),
