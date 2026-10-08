@@ -1125,13 +1125,14 @@ elif page == "⌕  تحليل":
 
     if run_analysis or autorun_analysis or (
         st.session_state.get("last_analysis")
-        and data_engine.display_symbol(st.session_state.last_analysis.get("symbol", "")) == data_engine.display_symbol(query)
+        and data_engine.display_symbol(st.session_state.last_analysis.get("symbol", "")) == data_engine.resolve_symbol(query)
     ):
         symbol_query = (query or "").strip()
         if not symbol_query:
             st.warning("اكتب رمز السهم أو اسم الشركة أولًا.")
         else:
             if run_analysis or autorun_analysis:
+                symbol_query = data_engine.resolve_symbol(symbol_query)
                 with st.spinner("جاري تحميل البيانات وتحليل السهم..."):
                     result = data_engine.get_full_analysis(symbol_query)
             else:
