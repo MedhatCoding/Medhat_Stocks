@@ -12,10 +12,9 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-# The 113-stock target universe agreed for the product.
-# The app ships with a dated Sharia reference list and supports updating it
-# through the SHARIA_SYMBOLS secret without changing the code.
-STOCK_UNIVERSE_SIZE = 113
+# The displayed Sharia universe is sourced from sharia_universe.py; keep this
+# value only as a backwards-compatible fallback for older UI code.
+STOCK_UNIVERSE_SIZE = 95
 OPPORTUNITY_SCORE_MIN = 0
 OPPORTUNITY_SCORE_MAX = 100
 
