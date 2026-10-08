@@ -967,7 +967,9 @@ class DataEngine:
         """Return the main EGX indices, with EGX33/Shariah treated as first-class."""
         specs = [
             {"name":"EGX30","symbol":"EGX30","candidates":["EGX30.INDX","CASE30.INDX","CASE30"],"yahoo":["%5ECASE30"]},
-            {"name":"EGX33 Shariah","symbol":"EGX33","candidates":["EGX33.INDX","EGX33"],"yahoo":["%5EEGX33.CA","%5EEGX33"]},
+            # EGX33 is the Egyptian Exchange Shariah index. Try documented vendor
+            # aliases, but never substitute EGX30 or an unrelated symbol as EGX33.
+            {"name":"EGX33 Shariah","symbol":"EGX33","candidates":["EGX33.INDX","EGX33.CA","EGX33"],"yahoo":["%5EEGX33.CA","%5EEGX33"]},
             {"name":"EGX35-LV","symbol":"EGX35-LV","candidates":["EGX35LV.INDX","EGX35-LV.INDX","EGX35LV"],"yahoo":["%5EEGX35LV.CA","%5EEGX35LV"]},
             {"name":"EGX70 EWI","symbol":"EGX70EWI","candidates":["EGX70EWI.INDX","EGX70.INDX","CCSI.INDX"],"yahoo":["%5EEGX70EWI.CA","%5EEGX70EWI","%5EEGX70"]},
             {"name":"EGX100 EWI","symbol":"EGX100EWI","candidates":["EGX100EWI.INDX","EGX100.INDX","EGX100"],"yahoo":["%5EEGX100EWI.CA","%5EEGX100EWI","%5EEGX100"]},
