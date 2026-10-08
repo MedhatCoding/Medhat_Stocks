@@ -33,6 +33,22 @@ jobs:
           print("Core imports passed.")
           PY
 
+      - name: Test neural-network training dimensions
+        run: |
+          python - <<'PY'
+          import numpy as np
+          from ml_engine import _fit_mlp
+          rng = np.random.default_rng(7)
+          X = rng.normal(size=(64, 9))
+          y = (X[:, 0] + 0.4 * X[:, 1] > 0).astype(float)
+          model = _fit_mlp(X, y, epochs=12)
+          pred = model(X[:8])
+          assert pred.shape == (8,), f"unexpected prediction shape: {pred.shape}"
+          assert np.isfinite(pred).all(), "model returned non-finite predictions"
+          assert ((pred >= 0) & (pred <= 1)).all(), "probabilities outside [0, 1]"
+          print("Neural-network training/prediction test passed.")
+          PY
+
       - name: Start Streamlit
         run: |
           streamlit run app.py --server.headless true --server.port 8501 > /tmp/streamlit.log 2>&1 &
