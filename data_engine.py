@@ -1049,6 +1049,7 @@ class DataEngine:
         label = "موسم قوي" if score >= 60 else ("موسم ضعيف" if score <= 40 else "موسم متوازن")
         return {"score": round(score, 1), "month": current_month, "avg_return": round(avg, 2), "samples": int(len(hist)), "positive_months_pct": round(positive, 1), "label": label}
 
+    @st.cache_data(ttl=86400, show_spinner=False)
     def get_market_seasonality(self, min_years=3):
         """Calendar-month behavior of the broad EGX30 market."""
         for candidate in ["EGX30.INDX", "CASE30.INDX"]:
