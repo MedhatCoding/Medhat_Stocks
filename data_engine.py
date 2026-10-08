@@ -17,6 +17,11 @@ except ImportError:
         {"symbol": "CSF", "name": "مصر شريعة إكويتي - للاستثمار في مؤشر الشريعة EGX33", "type": "صندوق مؤشر", "benchmark": "EGX33 Shariah"},
     ]
     SHARIA_FUND_MAP = {x["symbol"]: x for x in SHARIA_INDEX_FUNDS}
+try:
+    from gold_funds import GOLD_FUNDS, GOLD_FUND_MAP
+except ImportError:
+    GOLD_FUNDS = []
+    GOLD_FUND_MAP = {}
 from ml_engine import train_and_predict
 from recommendation_journal import adaptive_feedback, record_opportunity
 
@@ -800,45 +805,67 @@ class DataEngine:
             regime = "متذبذب"
         return {"success": True, "symbol": history["symbol"], "date": str(frame.iloc[-1]["date"].date()), "close": self._num(close.iloc[-1]), "sma20": self._num(sma20), "sma50": self._num(sma50), "return20": self._num(ret20), "regime": regime}
 
+    @st.cache_data(ttl=600, show_spinner=False)
     def get_market_indices(self):
-        """Fetch the main EGX index family, not EGX30 alone."""
-        definitions = [
-            ("EGX30", ["EGX30.INDX", "CASE30.INDX"]),
-            ("EGX70 EWI", ["EGX70.INDX", "EGX70_EWI.INDX"]),
-            ("EGX100 EWI", ["EGX100.INDX", "EGX100_EWI.INDX"]),
-            ("EGX30 CAP", ["EGX30CAP.INDX", "EGX30_CAP.INDX"]),
-            ("EGX30-TR", ["EGX30TR.INDX", "EGX30_TR.INDX"]),
-            ("EGX35-LV", ["EGX35LV.INDX", "EGX35_LV.INDX"]),
-            ("EGX SHARIAH", ["EGXSHARIAH.INDX", "EGX_SHARIAH.INDX"]),
-            ("TAMAYUZ", ["TAMAYUZ.INDX"]),
+        """Build a resilient EGX index board using OANOR, EODHD and Yahoo fallbacks."""
+        definitions=[
+            ("EGX30",["EGX30.INDX","CASE30.INDX"],["^CASE30"]),
+            ("EGX70 EWI",["EGX70EWI.INDX","EGX70_EWI.INDX"],["^EGX70EWI.CA","^EGX70EWI"]),
+            ("EGX100 EWI",["EGX100EWI.INDX","EGX100_EWI.INDX"],["^EGX100EWI.CA","^EGX100EWI"]),
+            ("EGX30 CAP",["EGX30CAP.INDX","EGX30_CAP.INDX"],["^EGX30CAP.CA","^EGX30CAP"]),
+            ("EGX30-TR",["EGX30TR.INDX","EGX30_TR.INDX"],["^EGX30TR.CA","^EGX30TR"]),
+            ("EGX35-LV",["EGX35LV.INDX","EGX35_LV.INDX"],["^EGX35LV.CA","^EGX35LV"]),
+            ("EGX SHARIAH",["EGXSHARIAH.INDX","EGX33SHARIAH.INDX","EGX_SHARIAH.INDX"],["^EGX33.CA","^EGXSHARIAH.CA"]),
+            ("TAMAYUZ",["TAMAYUZ.INDX"],["^TAMAYUZ.CA"]),
         ]
-        result = []
-        for name, candidates in definitions:
-            item = None
-            for symbol in candidates:
+        result=[]
+        for name,eod_candidates,yahoo_candidates in definitions:
+            item=None
+            if name=="EGX30":
+                mc=self.get_market_context()
+                if mc.get("success") and mc.get("available") and mc.get("close") is not None:
+                    item={"name":name,"symbol":mc.get("symbol","EGX30"),"close":mc.get("close"),
+                          "change_pct":None,"return20":mc.get("return20"),"date":mc.get("date")}
+            for symbol in eod_candidates:
+                if item: break
                 try:
-                    history = self._get(f"eod/{symbol}", {"period": "d", "order": "d"}, timeout=20)
-                    rows = history.get("data") or [] if history.get("success") else []
-                    if len(rows) >= 2:
-                        frame = self._series(rows)
-                        if len(frame) >= 2:
-                            close = self._num(frame["close"].iloc[-1])
-                            prev = self._num(frame["close"].iloc[-2])
-                            if close is not None and prev not in (None, 0):
-                                change = (close / prev - 1) * 100
-                                ret20 = self._num(frame["close"].pct_change(20).iloc[-1] * 100) if len(frame) >= 21 else None
-                                item = {
-                                    "name": name, "symbol": symbol, "close": close,
-                                    "change_pct": change, "return20": ret20,
-                                    "date": str(frame.iloc[-1]["date"].date()),
-                                }
+                    h=self._get(f"eod/{symbol}",{"period":"d","order":"d"},timeout=15)
+                    rows=h.get("data") or [] if h.get("success") else []
+                    frame=self._series(rows)
+                    if len(frame)>=2:
+                        close=self._num(frame["close"].iloc[-1]); prev=self._num(frame["close"].iloc[-2])
+                        if close is not None and prev not in (None,0):
+                            item={"name":name,"symbol":symbol,"close":close,"change_pct":(close/prev-1)*100,
+                                  "return20":self._num(frame["close"].pct_change(20).iloc[-1]*100) if len(frame)>=21 else None,
+                                  "date":str(frame.iloc[-1]["date"].date())}
+                            break
+                except Exception: pass
+            if not item:
+                for symbol in yahoo_candidates:
+                    try:
+                        r=requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+                                       params={"range":"2y","interval":"1d","events":"history"},
+                                       headers={"User-Agent":"Mozilla/5.0"},timeout=15)
+                        r.raise_for_status()
+                        obj=((r.json().get("chart") or {}).get("result") or [None])[0]
+                        if not obj: continue
+                        ts=obj.get("timestamp") or []
+                        q=((obj.get("indicators") or {}).get("quote") or [{}])[0]
+                        closes=q.get("close") or []
+                        rows=[{"date":datetime.fromtimestamp(ts[i],timezone.utc).strftime("%Y-%m-%d"),"close":closes[i]}
+                              for i in range(min(len(ts),len(closes))) if closes[i] is not None]
+                        frame=self._series(rows)
+                        if len(frame)>=2:
+                            close=self._num(frame["close"].iloc[-1]); prev=self._num(frame["close"].iloc[-2])
+                            if close is not None and prev not in (None,0):
+                                item={"name":name,"symbol":symbol,"close":close,"change_pct":(close/prev-1)*100,
+                                      "return20":self._num(frame["close"].pct_change(20).iloc[-1]*100) if len(frame)>=21 else None,
+                                      "date":str(frame.iloc[-1]["date"].date())}
                                 break
-                except Exception:
-                    continue
-            if item:
-                result.append(item)
-        return {"success": True, "count": len(result), "indices": result}
-    
+                    except Exception: pass
+            if item: result.append(item)
+        return {"success":bool(result),"count":len(result),"indices":result}
+
     def get_market_snapshot(self, limit=96):
         """Build a compact EGX market board from available daily quotes."""
         rows = []
@@ -1030,6 +1057,15 @@ class DataEngine:
                 continue
         return {"score": 50, "month": datetime.now().month, "avg_return": None, "samples": 0, "label": "بيانات موسمية للسوق غير كافية"}
 
+    def get_gold_funds(self):
+        return {"success":True,"funds":GOLD_FUNDS,"count":len(GOLD_FUNDS)}
+
+    def get_asset_allocation_context(self):
+        market=self.get_market_context()
+        season=self.get_market_seasonality(min_years=3)
+        return {"market_regime":market.get("regime","غير متاح"),
+                "seasonality":season,"sharia_funds":SHARIA_INDEX_FUNDS,"gold_funds":GOLD_FUNDS}
+
     def get_full_analysis(self, symbol):
         technical = self.analyze_stock(symbol)
         if not technical.get("success"): return technical
@@ -1055,7 +1091,8 @@ class DataEngine:
         setup["seasonality_score"] = seasonality_score
         setup["seasonality"] = seasonality
         setup["final_opportunity_score"] = max(0, min(100, round(float(setup.get("final_opportunity_score", setup.get("opportunity_score", 50))) + (seasonality_score - 50) * 0.12)))
-        return {**technical, "sharia_compliant": sharia, "sharia_fund": bool(fund_info), "fund_info": fund_info or {}, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "fundamentals": fundamentals if fundamentals.get("success") else {}, "news": news_rows, **setup}
+        return {**technical, "sharia_compliant": sharia, "sharia_fund": bool(fund_info), "fund_info": fund_info or {},
+                "gold_funds": GOLD_FUNDS, "asset_allocation": self.get_asset_allocation_context(), "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "fundamentals": fundamentals if fundamentals.get("success") else {}, "news": news_rows, **setup}
 
 
 data_engine = DataEngine()
