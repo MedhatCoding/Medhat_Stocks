@@ -822,20 +822,118 @@ class DataEngine:
 
     @st.cache_data(ttl=600, show_spinner=False)
     def get_market_indices(_self):
-        """Return verified EGX index data without brute-forcing unknown symbols."""
-        result = []
-        mc = _self.get_market_context()
-        if mc.get("success") and mc.get("available") and mc.get("close") is not None:
-            result.append({
-                "name": "EGX30",
-                "symbol": "EGX30",
-                "close": mc.get("close"),
-                "change_pct": mc.get("change_pct"),
-                "return20": mc.get("return20"),
-                "date": mc.get("date"),
-                "provider": mc.get("provider", "OANOR"),
-            })
-        return {"success": bool(result), "count": len(result), "indices": result}
+        """Return the main EGX indices, with EGX33/Shariah treated as first-class."""
+        specs = [
+            {"name":"EGX30","symbol":"EGX30","candidates":["EGX30.INDX","CASE30.INDX","CASE30"]},
+            {"name":"EGX33 Shariah","symbol":"EGX33","candidates":["EGX33.INDX","EGX33"]},
+            {"name":"EGX35-LV","symbol":"EGX35-LV","candidates":["EGX35LV.INDX","EGX35-LV.INDX","EGX35LV"]},
+            {"name":"EGX70 EWI","symbol":"EGX70EWI","candidates":["EGX70EWI.INDX","EGX70.INDX","CCSI.INDX"]},
+            {"name":"EGX100 EWI","symbol":"EGX100EWI","candidates":["EGX100EWI.INDX","EGX100.INDX","EGX100"]},
+            {"name":"EGX30 Capped","symbol":"EGX30CAP","candidates":["EGX30CAP.INDX","EGX30CAP"]},
+            {"name":"EGX30-TR","symbol":"EGX30TR","candidates":["EGX30TR.INDX","EGX30TR"]},
+            {"name":"TAMAYUZ","symbol":"TAMAYUZ","candidates":["TAMAYUZ.INDX","TAMAYUZ"]},
+        ]
+
+        def calc(rows):
+            if not isinstance(rows, list):
+                return None
+            frame = _self._series(rows)
+            if len(frame) < 2 or "close" not in frame:
+                return None
+            close = frame["close"].dropna()
+            if len(close) < 2:
+                return None
+            last = _self._num(close.iloc[-1])
+            prev = _self._num(close.iloc[-2])
+            if last is None:
+                return None
+            change_pct = ((last / prev) - 1) * 100 if prev not in (None, 0) else None
+            ret20 = ((last / close.iloc[-21]) - 1) * 100 if len(close) >= 21 else None
+            sma20 = close.tail(20).mean() if len(close) >= 20 else None
+            sma50 = close.tail(50).mean() if len(close) >= 50 else None
+            if sma20 is not None and sma50 is not None and last > sma20 > sma50 and (ret20 or 0) > 0:
+                regime = "إيجابي"
+            elif sma20 is not None and sma50 is not None and last < sma20 < sma50 and (ret20 or 0) < 0:
+                regime = "ضعيف"
+            else:
+                regime = "متذبذب"
+            date_value = frame.iloc[-1].get("date")
+            return {
+                "close": last,
+                "change_pct": change_pct,
+                "return20": ret20,
+                "sma20": _self._num(sma20),
+                "sma50": _self._num(sma50),
+                "date": str(date_value.date()) if hasattr(date_value, "date") else str(date_value or ""),
+                "regime": regime,
+            }
+
+        indices = []
+        for spec in specs:
+            item = None
+
+            # EGX/OANOR currently exposes a dedicated index endpoint for EGX30.
+            if spec["symbol"] == "EGX30" and _self.oanor_api_key:
+                live = _self._oanor_get("egx-api/v1/index", timeout=15)
+                if live.get("success"):
+                    payload = live.get("data") or {}
+                    row = payload.get("data") or payload.get("index") or payload
+                    if isinstance(row, list):
+                        row = row[0] if row else {}
+                    if isinstance(row, dict):
+                        value = _self._num(row.get("value") or row.get("close") or row.get("price"))
+                        if value is not None:
+                            item = {
+                                "close": value,
+                                "change_pct": _self._num(row.get("change_percent") or row.get("change_pct") or row.get("changePercent")),
+                                "return20": None,
+                                "sma20": None, "sma50": None,
+                                "date": row.get("date") or row.get("timestamp") or "",
+                                "regime": "متاح لحظيًا",
+                            }
+
+            # EODHD is the primary historical index source. Try only known symbols.
+            if item is None:
+                for candidate in spec["candidates"]:
+                    history = _self._get(
+                        f"eod/{candidate}",
+                        {"period":"d","order":"d"},
+                        timeout=20,
+                    )
+                    if history.get("success") and isinstance(history.get("data"), list):
+                        item = calc(history["data"])
+                        if item:
+                            item["provider"] = "EODHD"
+                            break
+
+            # Yahoo is a last-resort historical source for index symbols.
+            if item is None:
+                for candidate in spec["candidates"]:
+                    try:
+                        y = _self._yahoo_history(candidate, period="2y")
+                        if y.get("success"):
+                            item = calc(y.get("data", []))
+                            if item:
+                                item["provider"] = "Yahoo Finance"
+                                break
+                    except Exception:
+                        continue
+
+            if item:
+                indices.append({
+                    "name": spec["name"],
+                    "symbol": spec["symbol"],
+                    **item,
+                })
+
+        # Keep the order fixed so EGX33 is always visible immediately after EGX30.
+        return {
+            "success": bool(indices),
+            "count": len(indices),
+            "expected_count": len(specs),
+            "indices": indices,
+            "missing": [x["name"] for x in specs if x["name"] not in {i["name"] for i in indices}],
+        }
 
     @st.cache_data(ttl=300, show_spinner=False)
     def get_market_snapshot(_self, limit=96):
