@@ -1091,187 +1091,219 @@ elif page == "▣  المحفظة":
                     st.rerun()
                 else:
                     st.error(msg)
+elif page == "⌕  تحليل":
+    st.markdown(
+        '<div class="hero"><div class="hero-title">تحليل سهم</div>'
+        '<div class="hero-sub">اكتب رمز سهم EGX أو اسم الشركة. سيتم عرض السعر والسيناريو فقط عند توفر بيانات كافية.</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    # Apply navigation-prefilled symbols before creating the keyed input widget.
+    nav_symbol = st.session_state.get("analysis_nav_symbol")
+    if nav_symbol:
+        st.session_state["analysis_input"] = data_engine.display_symbol(nav_symbol)
+        st.session_state.analysis_nav_symbol = None
+        st.session_state.analysis_autorun = True
+
+    autorun_analysis = bool(st.session_state.pop("analysis_autorun", False))
+    query = st.text_input(
+        "رمز السهم أو اسم الشركة",
+        key="analysis_input",
+        placeholder="مثال: SWDY أو COMI",
+    )
+    run_analysis = st.button("🔎 تحليل السهم", key="run_stock_analysis", use_container_width=True, type="primary")
+
+    if run_analysis or autorun_analysis:
+        symbol_query = (query or "").strip()
+        if not symbol_query:
+            st.warning("اكتب رمز السهم أو اسم الشركة أولًا.")
+        else:
+            with st.spinner("جاري تحميل البيانات وتحليل السهم..."):
+                result = data_engine.get_full_analysis(symbol_query)
+            if not result or not result.get("success"):
+                st.warning(friendly_error((result or {}).get("error", "تعذر تحليل السهم لعدم توفر بيانات كافية.")))
             else:
                 st.session_state.last_analysis = result
-                st.session_state.last_ai = None
-                # IMPORTANT: analysis_query belongs to st.text_input and must never be
-                # assigned after that widget has been created. Keep navigation state separate.
-                symbol = result["symbol"].replace(".EGX", "")
-                sharia_ok = sharia_status(symbol)
-
-                status_class = "gold" if sharia_ok else "red"
-                status_text = "✓ موجود في القائمة الشرعية المرجعية" if sharia_ok else "⚠ غير موجود في القائمة الشرعية المرجعية"
-
-                st.markdown(
-                    f'<div class="hero"><div class="hero-title">{company_display_name(result, "اسم الشركة غير متاح")}</div>'
-                    f'<div class="hero-sub">رمز التداول: {symbol} • آخر جلسة متاحة: {result["date"]}</div>'
-                    f'<span class="badge {status_class}">{status_text}</span></div>',
-                    unsafe_allow_html=True,
-                )
-
-                st.markdown(
-                    '<div class="m-card-grid">'
-                    f'{price_card("السعر الحالي", result["close"], result.get("change_pct"), "آخر سعر/إغلاق متاح")}'
-                    f'{app_card("نسبة التغير", pct(result["change_pct"]), "الجلسة الأخيرة", value_class(result.get("change_pct")))}'
-                    f'{app_card("أعلى سعر", money(result["high"]), "الجلسة")}'
-                    f'{app_card("أقل سعر", money(result["low"]), "الجلسة")}'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
-
-                st.markdown('<div class="section">السيناريو التحليلي</div>', unsafe_allow_html=True)
-                st.markdown(
-                    '<div class="premarket">'
-                    f'<div class="premarket-title">{result.get("setup","لا توجد إشارة كافية")}</div>'
-                    f'<div class="premarket-body">درجة الفرصة <b>{result.get("final_opportunity_score","—")}/100</b> • '
-                    f'الارتداد <b>{result.get("rebound_score","—")}/100</b> • المخاطر <b>{result.get("risk_score","—")}/100</b><br>'
-                    f'السعر الحالي: <b>{money(result.get("close"))}</b> • مرجع الدخول: <b>{money(result.get("entry_reference"))}</b><br>'
-                    f'المستهدف 1: <b>{money(result.get("target1"))}</b> • المستهدف 2: <b>{money(result.get("target2"))}</b><br>'
-                    f'وقف الخسارة: <b>{money(result.get("stop"))}</b> • إلغاء السيناريو: <b>{money(result.get("invalidation"))}</b> • '
-                    f'R:R: <b>{money(result.get("risk_reward"))}</b></div>'
-                    '</div>', unsafe_allow_html=True,
-                )
-
-                ml = result.get("ml", {})
-                if ml.get("success"):
-                    st.markdown(
-                        '<div class="section">🧠 التعلم الآلي</div>'
-                        f'<div class="premarket"><div class="premarket-title">احتمال تاريخي محسوب بالنموذج</div>'
-                        f'<div class="premarket-body">احتمال تحقق سيناريو +{ml.get("target_pct",3)}% خلال {ml.get("horizon_days",10)} جلسات قبل وقف {ml.get("stop_pct",4)}%: '
-                        f'<b>{ml.get("probability","—")}%</b><br>'
-                        f'عينات التدريب: <b>{ml.get("samples","—")}</b> • دقة الاختبار: <b>{ml.get("validation_accuracy","—")}%</b><br>'
-                        f'Logistic: <b>{ml.get("logistic_probability","—")}%</b> • Deep Learning: <b>{ml.get("deep_learning_probability","—")}%</b> • '
-                        f'العينة المغلقة من التوصيات: <b>{ml.get("feedback_samples","—")}</b></div></div>',
-                        unsafe_allow_html=True,
-                    )
-
-                if result.get("sharia_fund"):
-                    fi = result.get("fund_info", {})
-                    st.info(f'📊 صندوق مؤشر الشريعة EGX33 — {fi.get("name","")} • المرجع: {fi.get("benchmark","EGX33 Shariah")}')
-                gold_funds = result.get("gold_funds") or []
-                if gold_funds:
-                    st.markdown('<div class="section">🪙 البديل الدفاعي: صناديق الذهب</div>', unsafe_allow_html=True)
-                    gf = pd.DataFrame([{"الرمز":f.get("symbol"),"الصندوق":f.get("name"),"الإدارة":f.get("manager"),
-                                        "المرجعية الشرعية":"مؤكدة" if f.get("sharia_compliant") else "غير مؤكدة"} for f in gold_funds])
-                    st.dataframe(gf, use_container_width=True, hide_index=True)
-                    st.caption("يُستخدم الذهب كأداة تحوط/تنويع عند ضعف السوق؛ لا يتم اعتباره فرصة سهم EGX ولا تُخلط درجته مع درجة السهم.")
-                season = result.get("seasonality") or {}
-                if season:
-                    st.markdown(
-                        '<div class="section">📅 موسمية السوق</div>'
-                        f'<div class="premarket"><div class="premarket-title">{season.get("label","—")}</div>'
-                        f'<div class="premarket-body">متوسط أداء نفس الشهر تاريخيًا: <b>{season.get("avg_return","—")}%</b> • '
-                        f'الفترات الإيجابية: <b>{season.get("positive_months_pct","—")}%</b> • '
-                        f'عينات: <b>{season.get("samples","—")}</b> • عامل الموسمية: <b>{season.get("score","—")}/100</b></div></div>',
-                        unsafe_allow_html=True,
-                    )
-
-                st.markdown('<div class="section">الأخبار</div>', unsafe_allow_html=True)
-                news_rows = result.get("news", [])
-                if news_rows:
-                    for news in news_rows[:5]:
-                        title = str(news.get("title") or "بدون عنوان").replace("<","&lt;").replace(">","&gt;")
-                        source = str(news.get("source") or "—").replace("<","&lt;").replace(">","&gt;")
-                        link = news.get("link") or ""
-                        if link:
-                            st.markdown(f'**{title}**  \n{source} • {news.get("date","—")} • [فتح الخبر]({link})')
-                        else:
-                            st.markdown(f'**{title}**  \n{source} • {news.get("date","—")}')
-                else:
-                    st.info("لا توجد أخبار متاحة لهذا السهم من مزودي البيانات الحاليين.")
-
-                st.markdown('<div class="section">ملخص التحليل</div>', unsafe_allow_html=True)
-                st.markdown(
-                    '<div class="m-card-grid">'
-                    f'{app_card("الحالة", result["status"], "الوضع الفني")}'
-                    f'{app_card("درجة الفرصة", result["opportunity_score"], "وصفية")}'
-                    f'{app_card("درجة المخاطر", result["risk_score"], "وصفية")}'
-                    f'{app_card("الدعم", money(result["support"]), "مستوى")}'
-                    f'{app_card("المقاومة", money(result["resistance"]), "مستوى")}'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
-
-                if sharia_ok:
-                    st.success("السهم موجود في قائمة الشرعية المرجعية المدمجة. راجع تاريخ المرجع قبل اتخاذ أي قرار.")
-                else:
-                    st.warning("السهم غير موجود في القائمة الشرعية المرجعية الحالية داخل التطبيق؛ لذلك لا يتم اعتباره فرصة شرعية مؤكدة.")
-
-                b1, b2 = st.columns(2)
-                with b1:
-                    if symbol in st.session_state.watchlist:
-                        st.info("السهم موجود بالفعل في قائمة المتابعة.")
-                    elif st.button("⭐ إضافة لقائمة المتابعة", use_container_width=True):
-                        add_watchlist(symbol)
-                        st.success("تمت الإضافة.")
-                with b2:
-                    if ai_enabled:
-                        with st.spinner("جاري صياغة شرح AI..."):
-                            fundamentals = result.get("fundamentals", {})
-                            st.session_state.last_fundamentals = fundamentals if fundamentals.get("success") else None
-                            ai = data_engine.ai_analysis(
-                                symbol,
-                                result,
-                                fundamentals if fundamentals.get("success") else {},
+                            st.session_state.last_ai = None
+                            # IMPORTANT: analysis_query belongs to st.text_input and must never be
+                            # assigned after that widget has been created. Keep navigation state separate.
+                            symbol = result["symbol"].replace(".EGX", "")
+                            sharia_ok = sharia_status(symbol)
+                
+                            status_class = "gold" if sharia_ok else "red"
+                            status_text = "✓ موجود في القائمة الشرعية المرجعية" if sharia_ok else "⚠ غير موجود في القائمة الشرعية المرجعية"
+                
+                            st.markdown(
+                                f'<div class="hero"><div class="hero-title">{company_display_name(result, "اسم الشركة غير متاح")}</div>'
+                                f'<div class="hero-sub">رمز التداول: {symbol} • آخر جلسة متاحة: {result["date"]}</div>'
+                                f'<span class="badge {status_class}">{status_text}</span></div>',
+                                unsafe_allow_html=True,
                             )
-                            st.session_state.last_ai = ai
-                    else:
-                        st.info("شرح Gemini متوقف لهذه العملية.")
+                
+                            st.markdown(
+                                '<div class="m-card-grid">'
+                                f'{price_card("السعر الحالي", result["close"], result.get("change_pct"), "آخر سعر/إغلاق متاح")}'
+                                f'{app_card("نسبة التغير", pct(result["change_pct"]), "الجلسة الأخيرة", value_class(result.get("change_pct")))}'
+                                f'{app_card("أعلى سعر", money(result["high"]), "الجلسة")}'
+                                f'{app_card("أقل سعر", money(result["low"]), "الجلسة")}'
+                                '</div>',
+                                unsafe_allow_html=True,
+                            )
+                
+                            st.markdown('<div class="section">السيناريو التحليلي</div>', unsafe_allow_html=True)
+                            st.markdown(
+                                '<div class="premarket">'
+                                f'<div class="premarket-title">{result.get("setup","لا توجد إشارة كافية")}</div>'
+                                f'<div class="premarket-body">درجة الفرصة <b>{result.get("final_opportunity_score","—")}/100</b> • '
+                                f'الارتداد <b>{result.get("rebound_score","—")}/100</b> • المخاطر <b>{result.get("risk_score","—")}/100</b><br>'
+                                f'السعر الحالي: <b>{money(result.get("close"))}</b> • مرجع الدخول: <b>{money(result.get("entry_reference"))}</b><br>'
+                                f'المستهدف 1: <b>{money(result.get("target1"))}</b> • المستهدف 2: <b>{money(result.get("target2"))}</b><br>'
+                                f'وقف الخسارة: <b>{money(result.get("stop"))}</b> • إلغاء السيناريو: <b>{money(result.get("invalidation"))}</b> • '
+                                f'R:R: <b>{money(result.get("risk_reward"))}</b></div>'
+                                '</div>', unsafe_allow_html=True,
+                            )
+                
+                            ml = result.get("ml", {})
+                            if ml.get("success"):
+                                st.markdown(
+                                    '<div class="section">🧠 التعلم الآلي</div>'
+                                    f'<div class="premarket"><div class="premarket-title">احتمال تاريخي محسوب بالنموذج</div>'
+                                    f'<div class="premarket-body">احتمال تحقق سيناريو +{ml.get("target_pct",3)}% خلال {ml.get("horizon_days",10)} جلسات قبل وقف {ml.get("stop_pct",4)}%: '
+                                    f'<b>{ml.get("probability","—")}%</b><br>'
+                                    f'عينات التدريب: <b>{ml.get("samples","—")}</b> • دقة الاختبار: <b>{ml.get("validation_accuracy","—")}%</b><br>'
+                                    f'Logistic: <b>{ml.get("logistic_probability","—")}%</b> • Deep Learning: <b>{ml.get("deep_learning_probability","—")}%</b> • '
+                                    f'العينة المغلقة من التوصيات: <b>{ml.get("feedback_samples","—")}</b></div></div>',
+                                    unsafe_allow_html=True,
+                                )
+                
+                            if result.get("sharia_fund"):
+                                fi = result.get("fund_info", {})
+                                st.info(f'📊 صندوق مؤشر الشريعة EGX33 — {fi.get("name","")} • المرجع: {fi.get("benchmark","EGX33 Shariah")}')
+                            gold_funds = result.get("gold_funds") or []
+                            if gold_funds:
+                                st.markdown('<div class="section">🪙 البديل الدفاعي: صناديق الذهب</div>', unsafe_allow_html=True)
+                                gf = pd.DataFrame([{"الرمز":f.get("symbol"),"الصندوق":f.get("name"),"الإدارة":f.get("manager"),
+                                                    "المرجعية الشرعية":"مؤكدة" if f.get("sharia_compliant") else "غير مؤكدة"} for f in gold_funds])
+                                st.dataframe(gf, use_container_width=True, hide_index=True)
+                                st.caption("يُستخدم الذهب كأداة تحوط/تنويع عند ضعف السوق؛ لا يتم اعتباره فرصة سهم EGX ولا تُخلط درجته مع درجة السهم.")
+                            season = result.get("seasonality") or {}
+                            if season:
+                                st.markdown(
+                                    '<div class="section">📅 موسمية السوق</div>'
+                                    f'<div class="premarket"><div class="premarket-title">{season.get("label","—")}</div>'
+                                    f'<div class="premarket-body">متوسط أداء نفس الشهر تاريخيًا: <b>{season.get("avg_return","—")}%</b> • '
+                                    f'الفترات الإيجابية: <b>{season.get("positive_months_pct","—")}%</b> • '
+                                    f'عينات: <b>{season.get("samples","—")}</b> • عامل الموسمية: <b>{season.get("score","—")}/100</b></div></div>',
+                                    unsafe_allow_html=True,
+                                )
+                
+                            st.markdown('<div class="section">الأخبار</div>', unsafe_allow_html=True)
+                            news_rows = result.get("news", [])
+                            if news_rows:
+                                for news in news_rows[:5]:
+                                    title = str(news.get("title") or "بدون عنوان").replace("<","&lt;").replace(">","&gt;")
+                                    source = str(news.get("source") or "—").replace("<","&lt;").replace(">","&gt;")
+                                    link = news.get("link") or ""
+                                    if link:
+                                        st.markdown(f'**{title}**  \n{source} • {news.get("date","—")} • [فتح الخبر]({link})')
+                                    else:
+                                        st.markdown(f'**{title}**  \n{source} • {news.get("date","—")}')
+                            else:
+                                st.info("لا توجد أخبار متاحة لهذا السهم من مزودي البيانات الحاليين.")
+                
+                            st.markdown('<div class="section">ملخص التحليل</div>', unsafe_allow_html=True)
+                            st.markdown(
+                                '<div class="m-card-grid">'
+                                f'{app_card("الحالة", result["status"], "الوضع الفني")}'
+                                f'{app_card("درجة الفرصة", result["opportunity_score"], "وصفية")}'
+                                f'{app_card("درجة المخاطر", result["risk_score"], "وصفية")}'
+                                f'{app_card("الدعم", money(result["support"]), "مستوى")}'
+                                f'{app_card("المقاومة", money(result["resistance"]), "مستوى")}'
+                                '</div>',
+                                unsafe_allow_html=True,
+                            )
+                
+                            if sharia_ok:
+                                st.success("السهم موجود في قائمة الشرعية المرجعية المدمجة. راجع تاريخ المرجع قبل اتخاذ أي قرار.")
+                            else:
+                                st.warning("السهم غير موجود في القائمة الشرعية المرجعية الحالية داخل التطبيق؛ لذلك لا يتم اعتباره فرصة شرعية مؤكدة.")
+                
+                            b1, b2 = st.columns(2)
+                            with b1:
+                                if symbol in st.session_state.watchlist:
+                                    st.info("السهم موجود بالفعل في قائمة المتابعة.")
+                                elif st.button("⭐ إضافة لقائمة المتابعة", use_container_width=True):
+                                    add_watchlist(symbol)
+                                    st.success("تمت الإضافة.")
+                            with b2:
+                                if ai_enabled:
+                                    with st.spinner("جاري صياغة شرح AI..."):
+                                        fundamentals = result.get("fundamentals", {})
+                                        st.session_state.last_fundamentals = fundamentals if fundamentals.get("success") else None
+                                        ai = data_engine.ai_analysis(
+                                            symbol,
+                                            result,
+                                            fundamentals if fundamentals.get("success") else {},
+                                        )
+                                        st.session_state.last_ai = ai
+                                else:
+                                    st.info("شرح Gemini متوقف لهذه العملية.")
+                
+                            st.markdown('<div class="section">الشارت</div>', unsafe_allow_html=True)
+                            chart = result["chart"].copy()
+                            chart["date"] = pd.to_datetime(chart["date"])
+                            chart = chart.set_index("date")
+                            chart.columns = ["الإغلاق", "SMA 20", "SMA 50", "SMA 200"]
+                            st.line_chart(chart, height=390)
+                
+                            if technical_visible:
+                                st.markdown('<div class="section">التفاصيل الفنية</div>', unsafe_allow_html=True)
+                                technical = pd.DataFrame([
+                                    ["RSI 14", money(result["rsi14"]), "قياس زخم"],
+                                    ["SMA 20", money(result["sma20"]), "متوسط قصير"],
+                                    ["SMA 50", money(result["sma50"]), "متوسط متوسط"],
+                                    ["SMA 200", money(result["sma200"]), "متوسط طويل"],
+                                    ["ATR 14", money(result["atr14"]), "نطاق حركة"],
+                                    ["العائد 20 جلسة", pct(result["return20"]), "أداء تاريخي"],
+                                    ["العائد 60 جلسة", pct(result["return60"]), "أداء تاريخي"],
+                                    ["التذبذب", pct(result["volatility20"]), "سنوي تقريبي"],
+                                    ["نسبة الحجم", money(result["volume_ratio"]), "مقابل متوسط 20 جلسة"],
+                                ], columns=["المؤشر", "القيمة", "المعنى"])
+                                st.dataframe(technical, use_container_width=True, hide_index=True)
+                
+                            if st.session_state.last_fundamentals:
+                                f = st.session_state.last_fundamentals
+                                st.markdown('<div class="section">لقطة أساسية</div>', unsafe_allow_html=True)
+                                st.markdown(
+                                    '<div class="m-card-grid">'
+                                    f'{app_card("الشركة", f.get("name", "—"), "الاسم")}'
+                                    f'{app_card("القطاع", f.get("sector", "—"), "التصنيف")}'
+                                    f'{app_card("القيمة السوقية", integer(f.get("market_cap")), "Market Cap")}'
+                                    f'{app_card("P/E", money(f.get("pe")), "مضاعف")}'
+                                    f'{app_card("عائد التوزيعات", pct(f.get("dividend_yield")), "Dividend Yield")}'
+                                    '</div>',
+                                    unsafe_allow_html=True,
+                                )
+                
+                            if st.session_state.last_ai and st.session_state.last_ai.get("success"):
+                                st.markdown('<div class="section">التحليل الذكي</div>', unsafe_allow_html=True)
+                                st.markdown(
+                                    f'<div class="ai-box">{st.session_state.last_ai["text"]}</div>',
+                                    unsafe_allow_html=True,
+                                )
+                                st.caption("التحليل الذكي يشرح البيانات المتاحة ولا يمثل توصية استثمارية أو حكماً شرعياً.")
+                
+                            st.markdown(
+                                '<div class="small-note">مصدر الأسعار: EODHD. قد تتأخر بيانات الإغلاق بحسب خطة مزود البيانات. '
+                                'الفلترة الشرعية مرجعية وليست فتوى؛ يرجى الرجوع إلى المرجع الشرعي المناسب عند الحاجة.</div>',
+                                unsafe_allow_html=True,
+                            )
+                
+                
+                # -----------------------------
+                # Settings
+                # -----------------------------
 
-                st.markdown('<div class="section">الشارت</div>', unsafe_allow_html=True)
-                chart = result["chart"].copy()
-                chart["date"] = pd.to_datetime(chart["date"])
-                chart = chart.set_index("date")
-                chart.columns = ["الإغلاق", "SMA 20", "SMA 50", "SMA 200"]
-                st.line_chart(chart, height=390)
-
-                if technical_visible:
-                    st.markdown('<div class="section">التفاصيل الفنية</div>', unsafe_allow_html=True)
-                    technical = pd.DataFrame([
-                        ["RSI 14", money(result["rsi14"]), "قياس زخم"],
-                        ["SMA 20", money(result["sma20"]), "متوسط قصير"],
-                        ["SMA 50", money(result["sma50"]), "متوسط متوسط"],
-                        ["SMA 200", money(result["sma200"]), "متوسط طويل"],
-                        ["ATR 14", money(result["atr14"]), "نطاق حركة"],
-                        ["العائد 20 جلسة", pct(result["return20"]), "أداء تاريخي"],
-                        ["العائد 60 جلسة", pct(result["return60"]), "أداء تاريخي"],
-                        ["التذبذب", pct(result["volatility20"]), "سنوي تقريبي"],
-                        ["نسبة الحجم", money(result["volume_ratio"]), "مقابل متوسط 20 جلسة"],
-                    ], columns=["المؤشر", "القيمة", "المعنى"])
-                    st.dataframe(technical, use_container_width=True, hide_index=True)
-
-                if st.session_state.last_fundamentals:
-                    f = st.session_state.last_fundamentals
-                    st.markdown('<div class="section">لقطة أساسية</div>', unsafe_allow_html=True)
-                    st.markdown(
-                        '<div class="m-card-grid">'
-                        f'{app_card("الشركة", f.get("name", "—"), "الاسم")}'
-                        f'{app_card("القطاع", f.get("sector", "—"), "التصنيف")}'
-                        f'{app_card("القيمة السوقية", integer(f.get("market_cap")), "Market Cap")}'
-                        f'{app_card("P/E", money(f.get("pe")), "مضاعف")}'
-                        f'{app_card("عائد التوزيعات", pct(f.get("dividend_yield")), "Dividend Yield")}'
-                        '</div>',
-                        unsafe_allow_html=True,
-                    )
-
-                if st.session_state.last_ai and st.session_state.last_ai.get("success"):
-                    st.markdown('<div class="section">التحليل الذكي</div>', unsafe_allow_html=True)
-                    st.markdown(
-                        f'<div class="ai-box">{st.session_state.last_ai["text"]}</div>',
-                        unsafe_allow_html=True,
-                    )
-                    st.caption("التحليل الذكي يشرح البيانات المتاحة ولا يمثل توصية استثمارية أو حكماً شرعياً.")
-
-                st.markdown(
-                    '<div class="small-note">مصدر الأسعار: EODHD. قد تتأخر بيانات الإغلاق بحسب خطة مزود البيانات. '
-                    'الفلترة الشرعية مرجعية وليست فتوى؛ يرجى الرجوع إلى المرجع الشرعي المناسب عند الحاجة.</div>',
-                    unsafe_allow_html=True,
-                )
-
-
-# -----------------------------
-# Settings
-# -----------------------------
 elif page == "⚙  الإعدادات":
     st.markdown(
         '<div class="hero"><div class="hero-title">الإعدادات وقياس الأداء</div>'
