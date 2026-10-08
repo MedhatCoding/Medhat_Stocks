@@ -9,7 +9,7 @@ import streamlit as st
 
 from data_engine import data_engine
 from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE, is_sharia_reference
-from config import APP_NAME, APP_VERSION, STOCK_UNIVERSE_SIZE
+from config import APP_NAME, APP_VERSION
 from portfolio_advisor import advise as portfolio_advise, asset_info as portfolio_asset_info
 
 # Optional live override: put SHARIA_SYMBOLS = "AAA,BBB,CCC" in Streamlit Secrets.
@@ -598,7 +598,7 @@ if page == "⌂  الرئيسية":
 
     last = st.session_state.last_analysis
     cards = [
-        ("الأسهم المستهدفة", STOCK_UNIVERSE_SIZE, "هدف المنصة"),
+        ("الأسهم الشرعية", len(SHARIA_SYMBOLS), "آخر مرجع شرعي"),
         ("المرجع الشرعي", len(SHARIA_SYMBOLS), f"حتى {REFERENCE_DATE}"),
         ("قائمة المتابعة", len(st.session_state.watchlist), "محفوظة تلقائيًا"),
         ("المحفظة", len(st.session_state.portfolio), "مراكز محفوظة"),
