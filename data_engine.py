@@ -1258,20 +1258,30 @@ class DataEngine:
             if symbol not in SHARIA_SYMBOLS: continue
             # Broad-universe screening uses technicals first; detailed single-stock
             # analysis loads fundamentals on demand to conserve EODHD API calls.
-            analysis = _self.analyze_stock(symbol, include_fundamentals=False)
-            if not analysis.get("success"):
+            try:
+                analysis = _self.analyze_stock(symbol, include_fundamentals=False)
+            except Exception:
+                # A malformed quote/history for one company must not stop the full scan.
+                continue
+            if not analysis or not analysis.get("success"):
                 continue
 
             # Use technical/risk gates before requesting news. News can adjust the
             # score by at most 8 points, so candidates below 47 cannot qualify at 55.
-            preliminary = _self._opportunity_setup(analysis, market, None, seasonality_score)
+            try:
+                preliminary = _self._opportunity_setup(analysis, market, None, seasonality_score)
+            except (TypeError, ValueError, KeyError):
+                continue
             risk_value = _self._num(analysis.get("risk_score"))
             if preliminary["hard_blocks"] or preliminary["final_opportunity_score"] < 47:
                 continue
             if preliminary["rebound_score"] < 45 or risk_value is None or risk_value > 65:
                 continue
 
-            news = _self.get_news(symbol, limit=5)
+            try:
+                news = _self.get_news(symbol, limit=5)
+            except Exception:
+                news = {"success": False, "data": []}
             news_rows = news.get("data", []) if news.get("success") else []
             polarities = [_self._num(x.get("polarity")) for x in news_rows]
             polarities = [x for x in polarities if x is not None]
