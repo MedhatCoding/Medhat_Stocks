@@ -1086,19 +1086,28 @@ class DataEngine:
                 if not result.get("success"):
                     continue
                 payload = result.get("data") or {}
-                quotes = payload.get("quotes") if isinstance(payload, dict) else payload
+                quotes = (payload.get("quotes") or payload.get("data")) if isinstance(payload, dict) else payload
+                if isinstance(quotes, dict):
+                    quotes = [quotes]
                 if not isinstance(quotes, list):
                     continue
                 for q in quotes:
                     if not isinstance(q, dict):
                         continue
-                    symbol = str(q.get("ticker") or q.get("code") or "").upper()
+                    symbol = _self.display_symbol(q.get("ticker") or q.get("code") or q.get("symbol") or "")
                     if symbol not in allowed:
                         continue
-                    price = _self._num(q.get("price") or q.get("close"))
+                    raw_price = q.get("price")
+                    if raw_price is None:
+                        raw_price = q.get("close")
+                    if raw_price is None:
+                        raw_price = q.get("last_price") or q.get("last")
+                    price = _self._num(raw_price)
                     raw_change = q.get("change_percent")
                     if raw_change is None:
                         raw_change = q.get("changePercent")
+                    if raw_change is None:
+                        raw_change = q.get("change_pct")
                     change_pct = _self._num(raw_change)
                     volume = _self._num(q.get("volume"))
                     if price is None or change_pct is None:
@@ -1115,7 +1124,9 @@ class DataEngine:
                     })
 
         if not rows:
-            for symbol in symbols:
+            # Bound the historical fallback to protect the EODHD request quota
+            # when OANOR quotes are unavailable; the UI labels the sample size.
+            for symbol in symbols[:24]:
                 try:
                     hist = _self.get_stock_history(symbol, days=35)
                     data = hist.get("data", []) if hist.get("success") else []
