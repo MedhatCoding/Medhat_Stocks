@@ -962,17 +962,12 @@ elif page == "▣  المحفظة":
         if submitted:
             symbol = data_engine.display_symbol(p_symbol)
             if symbol and p_qty > 0 and p_avg > 0:
-                existing = next((x for x in st.session_state.portfolio if x["symbol"] == symbol), None)
                 ok, msg = upsert_portfolio_position({"symbol": symbol, "qty": p_qty, "avg": p_avg})
                 if ok:
                     st.session_state.portfolio = load_portfolio()
                     st.success("تم حفظ المركز وسيتم تقييمه تلقائيًا.")
                 else:
                     st.error(msg)
-            else:
-                    st.session_state.portfolio.append({"symbol": symbol, "qty": p_qty, "avg": p_avg})
-                save_personal_data()
-                st.success("تم حفظ المركز وسيتم تقييمه تلقائيًا.")
             else:
                 st.warning("أدخل الرمز والكمية ومتوسط التكلفة.")
 
