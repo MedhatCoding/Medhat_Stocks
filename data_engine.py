@@ -1267,7 +1267,18 @@ class DataEngine:
             symbol = str(item.get("code") or "").upper()
             if symbol not in SHARIA_SYMBOLS: continue
             analysis = _self.analyze_stock(symbol)
-            if not analysis.get("success"): continue
+            if not analysis.get("success"):
+                continue
+
+            # Use technical/risk gates before requesting news. News can adjust the
+            # score by at most 8 points, so candidates below 47 cannot qualify at 55.
+            preliminary = _self._opportunity_setup(analysis, market, None, seasonality_score)
+            risk_value = _self._num(analysis.get("risk_score"))
+            if preliminary["hard_blocks"] or preliminary["final_opportunity_score"] < 47:
+                continue
+            if preliminary["rebound_score"] < 45 or risk_value is None or risk_value > 65:
+                continue
+
             news = _self.get_news(symbol, limit=5)
             news_rows = news.get("data", []) if news.get("success") else []
             polarities = [_self._num(x.get("polarity")) for x in news_rows]
@@ -1276,14 +1287,11 @@ class DataEngine:
             setup = _self._opportunity_setup(analysis, market, news_score, seasonality_score)
             # Keep the opportunities screen limited to qualified setups; do not
             # display blocked or high-risk candidates as actionable opportunities.
-            if setup["hard_blocks"]:
-                continue
-            if setup["final_opportunity_score"] < 55:
+            if setup["hard_blocks"] or setup["final_opportunity_score"] < 55:
                 continue
             if setup["rebound_score"] < 45:
                 continue
-            risk_value = _self._num(analysis.get("risk_score"))
-            if risk_value is None or risk_value > 65:
+            if risk_value > 65:
                 continue
             rows.append({"symbol": symbol, "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
                 "name_en": item.get("name") or symbol, "date": analysis.get("date"), "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "seasonality_score": setup.get("seasonality_score"), "defensive_bias": setup.get("defensive_bias")})
