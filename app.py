@@ -1336,6 +1336,8 @@ elif page == "⌕  تحليل":
                         unsafe_allow_html=True,
                     )
                     st.caption("التحليل الذكي يشرح البيانات المتاحة ولا يمثل توصية استثمارية أو حكماً شرعياً.")
+                elif st.session_state.last_ai:
+                    st.warning(friendly_error(st.session_state.last_ai.get("error", "تعذر إعداد شرح AI.")))
 
                 st.markdown(
                     '<div class="small-note">مصدر الأسعار: EODHD. قد تتأخر بيانات الإغلاق بحسب خطة مزود البيانات. '
