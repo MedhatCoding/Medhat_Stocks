@@ -1,5 +1,6 @@
 import os
 import json
+import html
 from pathlib import Path
 from datetime import datetime
 
@@ -517,19 +518,24 @@ def value_class(value):
         return "flat"
 
 def app_card(label, value, note="", tone="flat"):
+    # Escape provider-supplied values before rendering HTML.
+    label_html = html.escape(str(label))
+    value_html = html.escape(str(value))
+    note_html = html.escape(str(note))
+    tone_html = html.escape(str(tone), quote=True)
     return (
-        f'<div class="m-card"><div class="m-label">{label}</div>'
-        f'<div class="m-value {tone}">{value}</div>'
-        f'<div class="m-note">{note}</div></div>'
+        f'<div class="m-card"><div class="m-label">{label_html}</div>'
+        f'<div class="m-value {tone_html}">{value_html}</div>'
+        f'<div class="m-note">{note_html}</div></div>'
     )
 
 def price_card(label, price, change=None, note=""):
     tone = value_class(change)
     change_text = f" • {pct(change)}" if change is not None else ""
     return (
-        f'<div class="m-card"><div class="m-label">{label}</div>'
-        f'<div class="m-value">{money(price)} <span class="price-change {tone}">{change_text}</span></div>'
-        f'<div class="m-note">{note}</div></div>'
+        f'<div class="m-card"><div class="m-label">{html.escape(str(label))}</div>'
+        f'<div class="m-value">{html.escape(money(price))} <span class="price-change {tone}">{html.escape(change_text)}</span></div>'
+        f'<div class="m-note">{html.escape(str(note))}</div></div>'
     )
 
 def company_display_name(result, fallback="الشركة"):
@@ -1138,7 +1144,7 @@ elif page == "⌕  تحليل":
                 status_text = "✓ موجود في القائمة الشرعية المرجعية" if sharia_ok else "⚠ غير موجود في القائمة الشرعية المرجعية"
 
                 st.markdown(
-                    f'<div class="hero"><div class="hero-title">{company_display_name(result, "اسم الشركة غير متاح")}</div>'
+                    f'<div class="hero"><div class="hero-title">{html.escape(company_display_name(result, "اسم الشركة غير متاح"))}</div>'
                     f'<div class="hero-sub">رمز التداول: {symbol} • آخر جلسة متاحة: {result["date"]}</div>'
                     f'<span class="badge {status_class}">{status_text}</span></div>',
                     unsafe_allow_html=True,
@@ -1292,7 +1298,7 @@ elif page == "⌕  تحليل":
                 if st.session_state.last_ai and st.session_state.last_ai.get("success"):
                     st.markdown('<div class="section">التحليل الذكي</div>', unsafe_allow_html=True)
                     st.markdown(
-                        f'<div class="ai-box">{st.session_state.last_ai["text"]}</div>',
+                        f'<div class="ai-box">{html.escape(str(st.session_state.last_ai["text"])).replace(chr(10), "<br>")}</div>',
                         unsafe_allow_html=True,
                     )
                     st.caption("التحليل الذكي يشرح البيانات المتاحة ولا يمثل توصية استثمارية أو حكماً شرعياً.")
