@@ -71,13 +71,13 @@ def _fit_mlp(X,Y,seed=42,epochs=450,lr=0.012):
         for i in range(len(W)-1):
             z=A[-1]@W[i]+B[i]; Z.append(z); A.append(_relu(z))
         z=A[-1]@W[-1]+B[-1]; Z.append(z); A.append(_sigmoid(z))
-        dz=(A[-1].ravel()-Y)
+        dz=(A[-1]-Y[:,None])
         for i in reversed(range(len(W))):
             a_prev=A[i]
-            W[i]-=lr*(a_prev.T@dz[:,None]/len(Y))
-            B[i]-=lr*dz.mean(axis=0) if np.ndim(dz)>0 else lr*dz
+            W[i]-=lr*(a_prev.T@dz/len(Y))
+            B[i]-=lr*dz.mean(axis=0)
             if i>0:
-                dz=(dz[:,None]@W[i].T).ravel()*(Z[i-1]>0)
+                dz=(dz@W[i].T)*(Z[i-1]>0)
     def predict(X2):
         a=X2
         for i in range(len(W)-1): a=_relu(a@W[i]+B[i])
