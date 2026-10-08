@@ -10,6 +10,7 @@ import streamlit as st
 from data_engine import data_engine
 from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE, is_sharia_reference
 from config import APP_NAME, APP_VERSION, STOCK_UNIVERSE_SIZE
+from portfolio_advisor import advise as portfolio_advise, asset_info as portfolio_asset_info
 
 # Optional live override: put SHARIA_SYMBOLS = "AAA,BBB,CCC" in Streamlit Secrets.
 try:
@@ -887,19 +888,20 @@ elif page == "☆  المتابعة":
 # -----------------------------
 elif page == "▣  المحفظة":
     st.markdown(
-        '<div class="hero"><div class="hero-title">المحفظة</div>'
-        '<div class="hero-sub">أدخل مراكزك، وسنحسب القيمة الحالية والربح/الخسارة باستخدام آخر سعر متاح.</div></div>',
+        '<div class="hero"><div class="hero-title">المحفظة الذكية</div>'
+        '<div class="hero-sub">أدخل الأسهم والصناديق التي تملكها، وسيحللها التطبيق تلقائيًا ويعطيك: زيادة • احتفاظ • بيع.</div></div>',
         unsafe_allow_html=True,
     )
+
     with st.form("portfolio_form"):
         c1, c2, c3 = st.columns(3)
         with c1:
-            p_symbol = st.text_input("رمز السهم", placeholder="SWDY")
+            p_symbol = st.text_input("رمز السهم / الصندوق", placeholder="SWDY أو BWA أو AZG")
         with c2:
             p_qty = st.number_input("الكمية", min_value=0.0, step=1.0)
         with c3:
             p_avg = st.number_input("متوسط التكلفة", min_value=0.0, step=0.01)
-        submitted = st.form_submit_button("إضافة / تحديث مركز", use_container_width=True)
+        submitted = st.form_submit_button("إضافة / تحديث المركز", use_container_width=True)
         if submitted:
             symbol = data_engine.display_symbol(p_symbol)
             if symbol and p_qty > 0 and p_avg > 0:
@@ -909,50 +911,123 @@ elif page == "▣  المحفظة":
                     existing["avg"] = p_avg
                 else:
                     st.session_state.portfolio.append({"symbol": symbol, "qty": p_qty, "avg": p_avg})
-                st.success("تم حفظ المركز.")
+                save_personal_data()
+                st.success("تم حفظ المركز وسيتم تقييمه تلقائيًا.")
             else:
                 st.warning("أدخل الرمز والكمية ومتوسط التكلفة.")
 
     if st.session_state.portfolio:
-        rows = []
+        # Calculate current values first so the advisor can detect concentration.
+        positions = []
         total_cost = 0.0
         total_value = 0.0
-        for i, pos in enumerate(st.session_state.portfolio):
-            latest = data_engine.get_latest_price(pos["symbol"])
-            price = latest.get("close") if latest.get("success") else None
-            value = price * pos["qty"] if price is not None else None
-            cost = pos["avg"] * pos["qty"]
-            pnl = value - cost if value is not None else None
+        for pos in st.session_state.portfolio:
+            price_result = data_engine.get_latest_price(pos["symbol"])
+            price = price_result.get("close") if price_result.get("success") else None
+            qty = float(pos.get("qty") or 0)
+            avg = float(pos.get("avg") or 0)
+            cost = qty * avg
+            value = qty * price if price is not None else None
             total_cost += cost
             if value is not None:
                 total_value += value
-            rows.append({
-                "الشركة": data_engine.arabic_company_name(pos["symbol"], pos["symbol"]), "الرمز": pos["symbol"], "الكمية": pos["qty"], "متوسط الدخول": money(pos["avg"]),
-                "السعر الحالي": money(price), "التغير %": pct(latest.get("change_pct")) if latest.get("success") else "—",
-                "القيمة الحالية": money(value), "الربح/الخسارة": money(pnl),
-            })
-            if st.button(f"✕ إزالة {pos['symbol']}", key=f"portfolio_remove_{pos['symbol']}_{i}", use_container_width=True):
+            positions.append((pos, price, value))
+
+        market = data_engine.get_market_context()
+        try:
+            allocation = data_engine.get_asset_allocation_context()
+            if allocation.get("market"):
+                market = {**market, **allocation.get("market", {})}
+            market["seasonality_score"] = allocation.get("seasonality_score")
+        except Exception:
+            pass
+
+        advisor_rows = []
+        for i, (pos, price, value) in enumerate(positions):
+            try:
+                analysis = data_engine.analyze_stock(pos["symbol"])
+            except Exception as exc:
+                analysis = {"success": False, "error": str(exc)}
+            advice = portfolio_advise(
+                pos,
+                analysis=analysis,
+                market=market,
+                portfolio_value=total_value,
+            )
+            advice["current_value"] = value
+            advice["cost"] = float(pos.get("qty") or 0) * float(pos.get("avg") or 0)
+            advisor_rows.append(advice)
+
+        pnl_total = total_value - total_cost if total_value else None
+
+        st.markdown(
+            '<div class="m-card-grid">'
+            f'{app_card("التكلفة", money(total_cost), "إجمالي التكلفة")}'
+            f'{app_card("القيمة", money(total_value), "القيمة الحالية")}'
+            f'{app_card("الربح/الخسارة", money(pnl_total), "غير محقق")}'
+            f'{app_card("عدد المراكز", len(st.session_state.portfolio), "مركز")}'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("### قرار المحفظة")
+        for i, advice in enumerate(advisor_rows):
+            action = advice.get("action", "بيانات غير كافية")
+            action_key = advice.get("action_key")
+            if action_key == "increase":
+                badge = "🟢 زيادة"
+            elif action_key == "sell":
+                badge = "🔴 بيع"
+            elif action_key == "hold":
+                badge = "🟡 احتفاظ"
+            else:
+                badge = "⚪ بيانات غير كافية"
+
+            pnl_text = pct(advice.get("pnl_pct")) if advice.get("pnl_pct") is not None else "—"
+            score_text = money(advice.get("score")) if advice.get("score") is not None else "—"
+            risk_text = money(advice.get("risk")) if advice.get("risk") is not None else "—"
+            st.markdown(
+                f'<div class="app-card" style="margin-bottom:10px;">'
+                f'<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">'
+                f'<div><b>{advice.get("name", advice.get("symbol"))}</b>'
+                f'<div style="opacity:.7;font-size:.85rem;">{advice.get("symbol")} • {advice.get("asset_type","")}</div></div>'
+                f'<div style="font-size:1.05rem;font-weight:800;">{badge}</div></div>'
+                f'<div style="margin-top:8px;">السعر: <b>{money(advice.get("price"))}</b> &nbsp; | &nbsp; '
+                f'ربح/خسارة: <b>{pnl_text}</b> &nbsp; | &nbsp; التقييم: <b>{score_text}</b> &nbsp; | &nbsp; المخاطر: <b>{risk_text}</b></div>'
+                f'<div style="margin-top:7px;opacity:.85;">{advice.get("reason","")}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            if st.button(f"✕ إزالة {advice.get('symbol')}", key=f"portfolio_remove_{advice.get('symbol')}_{i}", use_container_width=True):
                 st.session_state.portfolio.pop(i)
                 save_personal_data()
                 st.rerun()
-        pnl_total = total_value - total_cost if total_value else None
-        st.markdown('<div class="m-card-grid">'
-                    f'{app_card("التكلفة", money(total_cost), "إجمالي التكلفة")}'
-                    f'{app_card("القيمة", money(total_value), "القيمة الحالية")}'
-                    f'{app_card("الربح/الخسارة", money(pnl_total), "غير محقق")}'
-                    f'{app_card("عدد المراكز", len(st.session_state.portfolio), "مركز")}'
-                    '</div>', unsafe_allow_html=True)
+
+        rows = []
+        for advice, pos_tuple in zip(advisor_rows, positions):
+            pos = pos_tuple[0]
+            rows.append({
+                "الشركة / الصندوق": advice.get("name", advice.get("symbol")),
+                "الرمز": advice.get("symbol"),
+                "النوع": advice.get("asset_type"),
+                "الكمية": pos.get("qty"),
+                "متوسط الدخول": money(pos.get("avg")),
+                "السعر الحالي": money(advice.get("price")),
+                "الربح/الخسارة %": pct(advice.get("pnl_pct")) if advice.get("pnl_pct") is not None else "—",
+                "القرار": advice.get("action"),
+                "سبب القرار": advice.get("reason"),
+            })
         frame = pd.DataFrame(rows)
         st.dataframe(frame, use_container_width=True, hide_index=True)
         st.download_button(
-            "⬇️ تنزيل المحفظة CSV",
+            "⬇️ تنزيل تقرير المحفظة CSV",
             frame.to_csv(index=False).encode("utf-8-sig"),
             file_name="medhat_stocks_portfolio.csv",
             mime="text/csv",
             use_container_width=True,
         )
     else:
-        st.info("لم تضف أي مركز بعد.")
+        st.info("لم تضف أي مركز بعد. يمكنك إضافة سهم شرعي أو صندوق شريعة/ذهب.")
 
 
 # -----------------------------
