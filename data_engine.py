@@ -807,7 +807,7 @@ class DataEngine:
         return {"success": True, "symbol": history["symbol"], "date": str(frame.iloc[-1]["date"].date()), "close": self._num(close.iloc[-1]), "sma20": self._num(sma20), "sma50": self._num(sma50), "return20": self._num(ret20), "regime": regime}
 
     @st.cache_data(ttl=600, show_spinner=False)
-    def get_market_indices(self):
+    def get_market_indices(_self):
         """Build a resilient EGX index board using OANOR, EODHD and Yahoo fallbacks."""
         definitions=[
             ("EGX30",["EGX30.INDX","CASE30.INDX"],["^CASE30"]),
@@ -823,21 +823,21 @@ class DataEngine:
         for name,eod_candidates,yahoo_candidates in definitions:
             item=None
             if name=="EGX30":
-                mc=self.get_market_context()
+                mc=_self.get_market_context()
                 if mc.get("success") and mc.get("available") and mc.get("close") is not None:
                     item={"name":name,"symbol":mc.get("symbol","EGX30"),"close":mc.get("close"),
                           "change_pct":mc.get("change_pct"),"return20":mc.get("return20"),"date":mc.get("date")}
             for symbol in eod_candidates:
                 if item: break
                 try:
-                    h=self._get(f"eod/{symbol}",{"period":"d","order":"d"},timeout=15)
+                    h=_self._get(f"eod/{symbol}",{"period":"d","order":"d"},timeout=15)
                     rows=h.get("data") or [] if h.get("success") else []
-                    frame=self._series(rows)
+                    frame=_self._series(rows)
                     if len(frame)>=2:
-                        close=self._num(frame["close"].iloc[-1]); prev=self._num(frame["close"].iloc[-2])
+                        close=_self._num(frame["close"].iloc[-1]); prev=_self._num(frame["close"].iloc[-2])
                         if close is not None and prev not in (None,0):
                             item={"name":name,"symbol":symbol,"close":close,"change_pct":(close/prev-1)*100,
-                                  "return20":self._num(frame["close"].pct_change(20).iloc[-1]*100) if len(frame)>=21 else None,
+                                  "return20":_self._num(frame["close"].pct_change(20).iloc[-1]*100) if len(frame)>=21 else None,
                                   "date":str(frame.iloc[-1]["date"].date())}
                             break
                 except Exception: pass
@@ -855,12 +855,12 @@ class DataEngine:
                         closes=q.get("close") or []
                         rows=[{"date":datetime.fromtimestamp(ts[i],timezone.utc).strftime("%Y-%m-%d"),"close":closes[i]}
                               for i in range(min(len(ts),len(closes))) if closes[i] is not None]
-                        frame=self._series(rows)
+                        frame=_self._series(rows)
                         if len(frame)>=2:
-                            close=self._num(frame["close"].iloc[-1]); prev=self._num(frame["close"].iloc[-2])
+                            close=_self._num(frame["close"].iloc[-1]); prev=_self._num(frame["close"].iloc[-2])
                             if close is not None and prev not in (None,0):
                                 item={"name":name,"symbol":symbol,"close":close,"change_pct":(close/prev-1)*100,
-                                      "return20":self._num(frame["close"].pct_change(20).iloc[-1]*100) if len(frame)>=21 else None,
+                                      "return20":_self._num(frame["close"].pct_change(20).iloc[-1]*100) if len(frame)>=21 else None,
                                       "date":str(frame.iloc[-1]["date"].date())}
                                 break
                     except Exception: pass
@@ -1050,16 +1050,16 @@ class DataEngine:
         return {"score": round(score, 1), "month": current_month, "avg_return": round(avg, 2), "samples": int(len(hist)), "positive_months_pct": round(positive, 1), "label": label}
 
     @st.cache_data(ttl=86400, show_spinner=False)
-    def get_market_seasonality(self, min_years=3):
+    def get_market_seasonality(_self, min_years=3):
         """Calendar-month behavior of the broad EGX30 market."""
         for candidate in ["EGX30.INDX", "CASE30.INDX"]:
             try:
-                history = self._get(f"eod/{candidate}", {"period": "d", "order": "d"}, timeout=25)
+                history = _self._get(f"eod/{candidate}", {"period": "d", "order": "d"}, timeout=25)
                 rows = history.get("data") or [] if history.get("success") else []
                 if len(rows) < 180:
                     continue
-                frame = self._series(rows)
-                return self.get_seasonality(frame, min_years=min_years)
+                frame = _self._series(rows)
+                return _self.get_seasonality(frame, min_years=min_years)
             except Exception:
                 continue
         return {"score": 50, "month": datetime.now().month, "avg_return": None, "samples": 0, "label": "بيانات موسمية للسوق غير كافية"}
