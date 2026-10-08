@@ -196,10 +196,11 @@ class DataEngine:
             if status in (401, 403):
                 return {"success": False, "error": "مفتاح مزود بيانات الأسعار غير صالح أو غير مصرح لهذا الطلب."}
             return {"success": False, "error": f"تعذر جلب بيانات الأسعار (HTTP {status or 'error'})."}
-        except requests.RequestException as exc:
-            return {"success": False, "error": str(exc)}
-        except ValueError as exc:
-            return {"success": False, "error": f"استجابة غير صالحة من مزود البيانات: {exc}"}
+        except requests.RequestException:
+            # Do not echo request URLs: they can contain the EODHD API token.
+            return {"success": False, "error": "تعذر الاتصال بمزود بيانات الأسعار."}
+        except ValueError:
+            return {"success": False, "error": "استجابة غير صالحة من مزود البيانات."}
 
     def _oanor_get(self, path, params=None, timeout=20):
         if not self.oanor_api_key:
@@ -392,7 +393,12 @@ class DataEngine:
                 row.get("previous_close") or row.get("prev_close") or
                 row.get("previousClose") or row.get("prevClose")
             )
-            change_pct = self._num(row.get("change_percent") or row.get("change_pct") or row.get("changePercent"))
+            raw_change = row.get("change_percent")
+            if raw_change is None:
+                raw_change = row.get("change_pct")
+            if raw_change is None:
+                raw_change = row.get("changePercent")
+            change_pct = self._num(raw_change)
             if close is not None:
                 if change_pct is None and previous not in (None, 0):
                     change_pct = (close / previous - 1) * 100
@@ -697,8 +703,9 @@ class DataEngine:
             if not text:
                 return {"success": False, "error": "لم يُرجع Gemini نصاً"}
             return {"success": True, "text": text}
-        except requests.RequestException as exc:
-            return {"success": False, "error": f"تعذر الاتصال بمحرك AI: {exc}"}
+        except requests.RequestException:
+            # Gemini API keys are sent as query parameters; never echo request URLs.
+            return {"success": False, "error": "تعذر الاتصال بمحرك AI."}
         except (ValueError, KeyError, TypeError) as exc:
             return {"success": False, "error": f"استجابة AI غير متوقعة: {exc}"}
 
@@ -952,7 +959,11 @@ class DataEngine:
                         if value is not None:
                             item = {
                                 "close": value,
-                                "change_pct": _self._num(row.get("change_percent") or row.get("change_pct") or row.get("changePercent")),
+                                "change_pct": _self._num(
+                                    row.get("change_percent") if row.get("change_percent") is not None
+                                    else row.get("change_pct") if row.get("change_pct") is not None
+                                    else row.get("changePercent")
+                                ),
                                 "return20": None,
                                 "sma20": None, "sma50": None,
                                 "date": row.get("date") or row.get("timestamp") or "",
@@ -1025,7 +1036,10 @@ class DataEngine:
                     if symbol not in allowed:
                         continue
                     price = _self._num(q.get("price") or q.get("close"))
-                    change_pct = _self._num(q.get("change_percent") or q.get("changePercent"))
+                    raw_change = q.get("change_percent")
+                    if raw_change is None:
+                        raw_change = q.get("changePercent")
+                    change_pct = _self._num(raw_change)
                     volume = _self._num(q.get("volume"))
                     if price is None or change_pct is None:
                         continue
