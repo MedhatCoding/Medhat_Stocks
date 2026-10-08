@@ -297,7 +297,7 @@ class DataEngine:
         return unique
 
     def resolve_symbol(self, query):
-        """Resolve a ticker, Arabic alias, or English company name to its ticker."""
+        """Resolve an unambiguous ticker or company name; reject vague name fragments."""
         raw = (query or "").strip()
         if not raw:
             return ""
@@ -306,13 +306,36 @@ class DataEngine:
             return code
         if re.fullmatch(r"[A-Z0-9]{2,8}", raw.upper()):
             return code
+
         folded = raw.casefold()
-        for symbol, arabic_name in self.ARABIC_COMPANY_NAMES.items():
-            name = arabic_name.casefold()
-            if folded in name or name in folded:
-                return symbol
-        matches = self.search_symbols(raw, limit=1)
-        return matches[0]["symbol"] if matches else code
+        exact_arabic = [
+            symbol for symbol, name in self.ARABIC_COMPANY_NAMES.items()
+            if folded == name.casefold()
+        ]
+        if len(exact_arabic) == 1:
+            return exact_arabic[0]
+        if len(exact_arabic) > 1:
+            return ""
+
+        # Partial Arabic matches are allowed only when they identify one company.
+        if len(folded) >= 5:
+            partial_arabic = [
+                symbol for symbol, name in self.ARABIC_COMPANY_NAMES.items()
+                if folded in name.casefold() or name.casefold() in folded
+            ]
+            partial_arabic = list(dict.fromkeys(partial_arabic))
+            if len(partial_arabic) == 1:
+                return partial_arabic[0]
+            if len(partial_arabic) > 1:
+                return ""
+
+        matches = self.search_symbols(raw, limit=5)
+        exact_names = [row["symbol"] for row in matches if folded == str(row.get("name", "")).casefold()]
+        if len(exact_names) == 1:
+            return exact_names[0]
+        if len(matches) == 1:
+            return matches[0]["symbol"]
+        return ""
 
     def _yahoo_index_history(self, yahoo_symbols, period="2y"):
         """Yahoo fallback for EGX index tickers; indices use ^ tickers."""
