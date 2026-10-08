@@ -49,6 +49,52 @@ jobs:
           print("Neural-network training/prediction test passed.")
           PY
 
+      - name: Test symbol resolution and Sharia guard
+        run: |
+          python - <<'PY'
+          from data_engine import data_engine
+          from portfolio_advisor import advise
+
+          assert data_engine.resolve_symbol("SWDY") == "SWDY"
+          assert data_engine.resolve_symbol("SWDY.EGX") == "SWDY"
+          assert data_engine.resolve_symbol("شركة السويدي إليكتريك") == "SWDY"
+
+          advice = advise(
+              {"symbol": "FAKE", "qty": 1, "avg": 10},
+              analysis={"success": True},
+              market={},
+          )
+          assert advice["action_key"] == "insufficient"
+          assert "القائمة الشرعية" in advice["reason"]
+          print("Symbol resolution and Sharia guard tests passed.")
+          PY
+
+      - name: Test stop-first handling for ambiguous daily candles
+        run: |
+          python - <<'PY'
+          import recommendation_journal as journal
+
+          original_read, original_write = journal._read, journal._write
+          rows = [{
+              "symbol": "SWDY", "date": "2026-01-01", "entry": 10,
+              "target1": 11, "target2": 12, "stop": 9, "status": "open"
+          }]
+          saved = []
+          journal._read = lambda: rows
+          journal._write = lambda updated: saved.extend(updated)
+          def history_loader(symbol, days=30):
+              return {"success": True, "data": [{
+                  "date": "2026-01-02", "open": 10, "high": 12,
+                  "low": 8, "close": 10, "volume": 1000
+              }]}
+          try:
+              journal.evaluate_open(history_loader, horizon=1)
+              assert saved and saved[0]["outcome"] == "stop", saved
+              print("Conservative stop-first test passed.")
+          finally:
+              journal._read, journal._write = original_read, original_write
+          PY
+
       - name: Start Streamlit
         run: |
           streamlit run app.py --server.headless true --server.port 8501 > /tmp/streamlit.log 2>&1 &
