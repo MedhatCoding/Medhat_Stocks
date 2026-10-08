@@ -36,7 +36,7 @@ def main():
     force = os.getenv("FORCE_TELEGRAM", "").lower() == "true"
 
     if not force:
-        # EGX trading days are Sunday through Thursday.
+        # EGX regular trading week is Sunday through Thursday.
         if now.weekday() not in (6, 0, 1, 2, 3):
             print("Weekend/non-trading day. No Telegram message.")
             return
@@ -52,10 +52,13 @@ def main():
     engine = DataEngine()
     report = engine.get_premarket_report(limit=12)
     if not report.get("success"):
-        print(f"Pre-market report unavailable: {report.get('error', 'unknown error')}")
-        return
+        raise RuntimeError(
+            f"Pre-market report unavailable: {report.get('error', 'unknown error')}"
+        )
 
+    indices_board = engine.get_market_indices()
     market = report.get("market", {})
+
     rows = [
         row for row in report.get("opportunities", [])
         if row.get("sharia_compliant") is True
@@ -65,21 +68,32 @@ def main():
     ]
     rows.sort(key=lambda row: float(row.get("opportunity_score") or 0), reverse=True)
 
-    # Explicit requirement: no message when there is no qualified opportunity.
-    if not rows:
-        print("No qualifying Sharia-compliant opportunity today. No message sent.")
-        return
-
     lines = [
-        "📊 <b>مدحت ستوكس — فرص EGX قبل الافتتاح</b>",
+        "📊 <b>مدحت ستوكس — تقرير صباح السوق</b>",
         f"📅 {html.escape(now.strftime('%Y-%m-%d'))} — {html.escape(now.strftime('%H:%M'))} القاهرة",
         f"📚 آخر جلسة مكتملة: <b>{html.escape(str(report.get('latest_session_date', 'غير متاح')))}</b>",
         f"📈 حالة السوق: <b>{html.escape(str(market.get('regime', 'غير متاح')))}</b>",
-        "",
     ]
+
+    index_rows = (indices_board or {}).get("indices", [])
+    if index_rows:
+        lines += ["", "📌 <b>المؤشرات</b>"]
+        # EGX33 first because it is the Sharia benchmark for this app.
+        index_rows = sorted(index_rows, key=lambda x: 0 if x.get("symbol") == "EGX33" else 1)
+        for idx in index_rows:
+            change = idx.get("change_pct")
+            change_text = "—" if change is None else f"{float(change):+.2f}%"
+            prefix = "☪️ " if idx.get("symbol") == "EGX33" else "• "
+            lines.append(
+                f"{prefix}{html.escape(str(idx.get('name', '—')))}: "
+                f"<b>{idx.get('close', '—')}</b> ({change_text})"
+            )
+
+    lines += ["", f"🎯 <b>الفرص المؤهلة: {len(rows)}</b>"]
 
     for index, row in enumerate(rows[:5], 1):
         symbol = html.escape(str(row.get("symbol", "—")))
+        name = html.escape(str(row.get("name") or symbol))
         score = row.get("opportunity_score", "—")
         rebound = row.get("rebound_score", "—")
         risk = row.get("risk_score", "—")
@@ -88,18 +102,22 @@ def main():
         news_text = "غير متاح" if news is None else f"{float(news):+.2f}"
         setup = html.escape(str(row.get("setup", "—")))
         lines.append(
-            f"<b>{index}. {symbol}</b> — فرصة {score}/100\n"
+            f"<b>{index}. {name} ({symbol})</b> — فرصة {score}/100\n"
             f"ارتداد {rebound}/100 • مخاطر {risk}/100 • RSI {rsi}\n"
             f"الأخبار {news_text} • {setup}"
         )
         lines.append("")
 
+    if not rows:
+        lines.append("ℹ️ لا توجد حاليًا فرصة شرعية تستوفي شروط الدخول؛ لم يتم اختلاق أي فرصة.")
+
     lines.append(
-        "⚠️ <i>هذه مرشحات تحليلية قبل الافتتاح وليست أمراً بالشراء أو البيع. "
-        "البيانات الفعلية فقط، ولا تُرسل رسالة عند عدم وجود فرصة مؤهلة.</i>"
+        "⚠️ <i>تقرير تحليلي شخصي قبل الافتتاح، وليس أمرًا بالشراء أو البيع. "
+        "يتم إرساله تلقائيًا في أيام السوق دون الحاجة لتشغيل التطبيق.</i>"
     )
+
     send_telegram(token, chat_id, "\n".join(lines))
-    print(f"Telegram sent: {len(rows[:5])} opportunities.")
+    print(f"Telegram sent successfully: {len(rows[:5])} opportunities.")
 
 
 if __name__ == "__main__":
