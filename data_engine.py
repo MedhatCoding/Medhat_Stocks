@@ -1087,48 +1087,85 @@ class DataEngine:
         }
 
     def _opportunity_setup(self, analysis, market=None, news_score=None, seasonality_score=50):
-        close,rsi,ret20=analysis.get("close"),analysis.get("rsi14"),analysis.get("return20")
-        atr,support=analysis.get("atr14"),analysis.get("support"); volume_ratio=analysis.get("volume_ratio")
-        rebound=0.0
+        close = analysis.get("close")
+        rsi = analysis.get("rsi14")
+        ret20 = analysis.get("return20")
+        atr = analysis.get("atr14")
+        support = analysis.get("support")
+        volume_ratio = analysis.get("volume_ratio")
+        risk = float(analysis.get("risk_score") or 0)
+        base = float(analysis.get("opportunity_score") or 0)
+        hard_blocks = list(analysis.get("hard_blocks") or [])
+
+        rebound = 0.0
         if rsi is not None:
-            if rsi<=30: rebound+=28
-            elif rsi<=35: rebound+=22
-            elif rsi<=40: rebound+=14
-            elif rsi<=45: rebound+=6
-        if ret20 is not None and ret20<0: rebound+=min(20,abs(ret20)*0.9)
+            if rsi <= 30: rebound += 30
+            elif rsi <= 35: rebound += 24
+            elif rsi <= 40: rebound += 16
+            elif rsi <= 45: rebound += 8
+        if ret20 is not None and ret20 < 0:
+            rebound += min(20, abs(ret20) * 0.9)
         if close and support:
-            distance=(close-support)/close*100
-            if distance<=3: rebound+=18
-            elif distance<=6: rebound+=12
-            elif distance<=10: rebound+=6
-        if volume_ratio is not None and volume_ratio>=1.15: rebound+=10
-        if analysis.get("change_pct") is not None and analysis["change_pct"]>0: rebound+=8
-        rebound=min(100,rebound)
-        trend=float(analysis.get("opportunity_score") or 0); risk=float(analysis.get("risk_score") or 0)
-        regime=(market or {}).get("regime","")
-        market_adj=8 if regime=="إيجابي" else (-10 if regime=="ضعيف" else 0)
-        season_adj=max(-6,min(6,(float(seasonality_score)-50)*0.12))
-        news_adj=max(-8,min(8,news_score*8)) if news_score is not None else 0
-        ml_data=analysis.get("ml",{}) if isinstance(analysis.get("ml"),dict) else {}
-        ml_probability=ml_data.get("probability") if ml_data.get("success") else None
-        ml_adj=((float(ml_probability)-50.0)*0.12) if ml_probability is not None else 0
-        final_score=max(0,min(100,round(trend*0.32+rebound*0.40+(100-risk)*0.18+market_adj+news_adj+ml_adj+season_adj)))
-        validation=ml_data.get("validation_accuracy")
-        confidence_parts=[min(100,max(0,float(final_score)))]
+            distance = (close - support) / close * 100
+            if distance <= 3: rebound += 18
+            elif distance <= 6: rebound += 12
+            elif distance <= 10: rebound += 6
+        if volume_ratio is not None and volume_ratio >= 1.15: rebound += 10
+        if analysis.get("change_pct") is not None and analysis["change_pct"] > 0: rebound += 8
+        rebound = min(100, rebound)
+
+        regime = (market or {}).get("regime", "")
+        market_adj = 7 if regime == "إيجابي" else (-10 if regime == "ضعيف" else 0)
+        season_adj = max(-6, min(6, (float(seasonality_score) - 50) * 0.12))
+        news_adj = max(-8, min(8, news_score * 8)) if news_score is not None else 0
+        ml_data = analysis.get("ml", {}) if isinstance(analysis.get("ml"), dict) else {}
+        ml_probability = ml_data.get("probability") if ml_data.get("success") else None
+        ml_adj = ((float(ml_probability) - 50.0) * 0.12) if ml_probability is not None else 0
+        relative = float(analysis.get("relative_score") or 50)
+        final_score = max(0, min(100, round(
+            base * 0.45 + rebound * 0.20 + (100-risk) * 0.15 +
+            relative * 0.10 + 50 * 0.10 + market_adj + news_adj + ml_adj + season_adj
+        )))
+        if hard_blocks:
+            final_score = min(final_score, 54)
+
+        validation = ml_data.get("validation_accuracy")
+        confidence_parts = [float(final_score)]
         if validation is not None: confidence_parts.append(float(validation))
-        if ml_probability is not None: confidence_parts.append(100-abs(float(ml_probability)-50)*1.4)
-        confidence_score=round(sum(confidence_parts)/len(confidence_parts))
-        setup="ارتداد محتمل" if rebound>=55 else ("تحت المراقبة" if rebound>=35 else "لا توجد إشارة ارتداد كافية")
-        target1=close+atr if close is not None and atr else None
-        target2=close+(2*atr) if close is not None and atr else None
-        stop=close-(1.2*atr) if close is not None and atr else None
-        rr=((target1-close)/(close-stop)) if target1 is not None and stop is not None and close!=stop else None
-        return {"rebound_score":round(rebound),"final_opportunity_score":final_score,"setup":setup,"entry_reference":close,
-                "target1":target1,"target2":target2,"stop":stop,"invalidation":support*0.98 if support else None,
-                "risk_reward":rr,"confidence_score":confidence_score,"ml_validation_accuracy":validation,
-                "market_regime":regime or "غير متاح","news_score":news_score,"ml_probability":ml_probability,
-                "seasonality_score":round(float(seasonality_score),1),
-                "defensive_bias":"ذهب/سيولة دفاعية" if (regime=="ضعيف" or float(seasonality_score)<42) else "أسهم شرعية انتقائية"}
+        if analysis.get("confidence") is not None: confidence_parts.append(float(analysis["confidence"]))
+        if ml_probability is not None: confidence_parts.append(100 - abs(float(ml_probability)-50) * 1.4)
+        confidence_score = round(sum(confidence_parts) / len(confidence_parts))
+
+        setup_label = "ارتداد محتمل" if rebound >= 55 else ("تحت المراقبة" if rebound >= 35 else "لا توجد إشارة ارتداد كافية")
+        entry = close
+        entry_low = analysis.get("entry_low")
+        entry_high = analysis.get("entry_high")
+        target1 = analysis.get("target1")
+        target2 = analysis.get("target2")
+        stop = analysis.get("stop")
+        rr = ((target1-entry)/(entry-stop)) if target1 is not None and stop is not None and entry and entry != stop else None
+
+        return {
+            "rebound_score": round(rebound),
+            "final_opportunity_score": final_score,
+            "setup": setup_label,
+            "entry_reference": entry,
+            "entry_low": entry_low, "entry_high": entry_high,
+            "target1": target1, "target2": target2, "stop": stop,
+            "invalidation": support * 0.98 if support else None,
+            "risk_reward": rr,
+            "confidence_score": confidence_score,
+            "confidence": analysis.get("confidence"),
+            "ml_validation_accuracy": validation,
+            "market_regime": regime or "غير متاح",
+            "news_score": news_score,
+            "ml_probability": ml_probability,
+            "relative_strength_egx33": analysis.get("relative_strength_egx33"),
+            "relative_score": analysis.get("relative_score"),
+            "seasonality_score": round(float(seasonality_score), 1),
+            "hard_blocks": hard_blocks,
+            "defensive_bias": "ذهب/سيولة دفاعية" if (regime == "ضعيف" or float(seasonality_score) < 42) else "أسهم شرعية انتقائية",
+        }
 
     @st.cache_data(ttl=900, show_spinner=False)
     def get_opportunities(_self, limit=20):
