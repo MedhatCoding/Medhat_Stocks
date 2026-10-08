@@ -62,7 +62,7 @@ def advise(position, analysis=None, market=None, portfolio_value=0.0):
             "action": action, "action_key": key, "reason": reason,
             "symbol": symbol, "name": info["name"], "asset_type": info["asset_type"],
             "price": price, "pnl_pct": pnl_pct, "score": None, "risk": None,
-            "ml_probability": None, "weight_pct": 0.0,
+            "ml_probability": None, "weight_pct": ((price * qty) / portfolio_value * 100) if portfolio_value and price is not None else 0.0,
         }
 
     if not analysis or not analysis.get("success"):
