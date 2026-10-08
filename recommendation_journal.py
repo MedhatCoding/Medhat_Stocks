@@ -132,54 +132,105 @@ def summary():
     }
 
 
-def backtest(history_loader, symbols, horizon=10):
+def backtest(history_loader, symbols, horizon=10, min_score=60):
+    """Walk-forward, no-lookahead backtest of the production-style ATR setup.
+
+    The test evaluates each historical decision point using only data available
+    up to that point. It reports return distribution, drawdown, profit factor,
+    hit rate, and exposure so the strategy can be compared with a benchmark.
+    """
     results = []
+    equity = 1.0
+    peak = 1.0
+    max_dd = 0.0
     for symbol in symbols:
-        history = history_loader(symbol, days=400)
+        history = history_loader(symbol, days=1200)
         if not history.get("success"):
             continue
         data = history.get("data", [])
-        if len(data) < 120:
+        if len(data) < 180:
             continue
-        frame = pd.DataFrame(data)
-        for col in ("open", "high", "low", "close"):
-            frame[col] = pd.to_numeric(frame[col], errors="coerce")
-        frame = frame.dropna(subset=["high", "low", "close"]).sort_values("date").reset_index(drop=True)
-        # Simple, non-lookahead test of the same ATR-based target/stop logic.
-        for i in range(80, len(frame) - horizon):
-            close = float(frame.iloc[i]["close"])
-            tr = pd.concat([
-                frame["high"] - frame["low"],
-                (frame["high"] - frame["close"].shift()).abs(),
-                (frame["low"] - frame["close"].shift()).abs()
-            ], axis=1).max(axis=1)
-            atr = float(tr.rolling(14).mean().iloc[i])
-            if not atr or atr <= 0:
+        frame = pd.DataFrame(data).sort_values("date").reset_index(drop=True)
+        for col in ("open", "high", "low", "close", "volume"):
+            if col in frame:
+                frame[col] = pd.to_numeric(frame[col], errors="coerce")
+        frame = frame.dropna(subset=["high","low","close"])
+        # Recompute features only through each decision point.
+        for i in range(90, len(frame) - horizon):
+            hist = frame.iloc[:i+1].copy()
+            close = float(hist.iloc[-1]["close"])
+            if close <= 0:
                 continue
-            entry, target, stop = close, close + atr, close - 1.2 * atr
+            tr = pd.concat([
+                hist["high"] - hist["low"],
+                (hist["high"] - hist["close"].shift()).abs(),
+                (hist["low"] - hist["close"].shift()).abs()
+            ], axis=1).max(axis=1)
+            atr = float(tr.rolling(14).mean().iloc[-1])
+            sma20 = float(hist["close"].rolling(20).mean().iloc[-1])
+            sma50 = float(hist["close"].rolling(50).mean().iloc[-1])
+            rsi_delta = hist["close"].diff()
+            gain = rsi_delta.clip(lower=0).rolling(14).mean().iloc[-1]
+            loss = (-rsi_delta.clip(upper=0)).rolling(14).mean().iloc[-1]
+            rsi = float(100 - 100/(1 + gain/loss)) if pd.notna(gain) and pd.notna(loss) and loss != 0 else 50.0
+            volume_ratio = None
+            if "volume" in hist:
+                avgv = hist["volume"].rolling(20).mean().iloc[-1]
+                if pd.notna(avgv) and avgv:
+                    volume_ratio = float(hist["volume"].iloc[-1] / avgv)
+            # Conservative entry filter: trend + momentum + non-extreme RSI + liquidity.
+            score = 0
+            score += 20 if close > sma20 else 0
+            score += 20 if close > sma50 else 0
+            score += 15 if sma20 > sma50 else 0
+            score += 20 if 45 <= rsi <= 68 else 0
+            score += 15 if volume_ratio is None or volume_ratio >= 0.7 else 0
+            score += 10 if hist["close"].pct_change(20).iloc[-1] > 0 else 0
+            if score < min_score or not atr or atr <= 0:
+                continue
+            target = close + atr
+            stop = close - 1.2 * atr
             future = frame.iloc[i+1:i+horizon+1]
             ht = bool((future["high"] >= target).any())
             hs = bool((future["low"] <= stop).any())
-            if ht and not hs:
-                ret = (target / entry - 1) * 100
-                outcome = "win"
-            elif hs and not ht:
-                ret = (stop / entry - 1) * 100
-                outcome = "loss"
+            if hs and not ht:
+                ret = (stop/close-1)*100
+                outcome="loss"
+            elif ht and not hs:
+                ret = (target/close-1)*100
+                outcome="win"
             else:
-                ret = (float(future.iloc[-1]["close"]) / entry - 1) * 100
-                outcome = "expired"
-            results.append({"symbol": symbol, "outcome": outcome, "return_pct": ret})
+                ret = (float(future.iloc[-1]["close"])/close-1)*100
+                outcome="expired"
+            results.append({"symbol":symbol,"date":str(frame.iloc[i]["date"]),
+                            "score":score,"return_pct":ret,"outcome":outcome})
+            equity *= 1 + ret/100 * 0.25
+            peak=max(peak,equity)
+            max_dd=max(max_dd,(peak-equity)/peak*100)
+
     if not results:
-        return {"success": False, "reason": "لا توجد بيانات كافية للـBacktest"}
-    df = pd.DataFrame(results)
-    wins = int((df.outcome == "win").sum())
-    losses = int((df.outcome == "loss").sum())
-    avg = float(df.return_pct.mean())
-    pf = float(df.loc[df.return_pct > 0, "return_pct"].sum() / abs(df.loc[df.return_pct < 0, "return_pct"].sum())) if (df.return_pct < 0).any() else None
-    return {"success": True, "samples": len(df), "wins": wins, "losses": losses,
-            "win_rate": round(wins / len(df) * 100, 1), "avg_return": round(avg, 2),
-            "profit_factor": round(pf, 2) if pf is not None else None}
+        return {"success":False,"reason":"لا توجد بيانات كافية للـWalk-forward Backtest"}
+    df=pd.DataFrame(results)
+    wins=int((df.outcome=="win").sum())
+    losses=int((df.outcome=="loss").sum())
+    positive=df.loc[df.return_pct>0,"return_pct"].sum()
+    negative=abs(df.loc[df.return_pct<0,"return_pct"].sum())
+    avg=float(df.return_pct.mean())
+    return {
+        "success":True,
+        "method":"Walk-forward / no-lookahead / ATR target-stop",
+        "samples":int(len(df)),
+        "symbols_tested":int(df.symbol.nunique()),
+        "wins":wins,"losses":losses,
+        "win_rate":round(wins/len(df)*100,1),
+        "avg_return":round(avg,2),
+        "median_return":round(float(df.return_pct.median()),2),
+        "profit_factor":round(float(positive/negative),2) if negative else None,
+        "max_drawdown":round(float(max_dd),2),
+        "best_trade":round(float(df.return_pct.max()),2),
+        "worst_trade":round(float(df.return_pct.min()),2),
+        "positive_return_rate":round(float((df.return_pct>0).mean()*100),1),
+    }
 
 
 def adaptive_feedback():
