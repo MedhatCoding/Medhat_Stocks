@@ -78,14 +78,30 @@ def delete_portfolio_position(symbol):
         return False, "تعذر حذف المركز: " + str(exc)
 
 def save_personal_data():
-    return True
+    try:
+        PERSONAL_DATA_FILE.write_text(json.dumps({'watchlist': st.session_state.get('watchlist', [])}, ensure_ascii=False, indent=2), encoding='utf-8')
+    except Exception:
+        pass
 
 _initial_portfolio = load_portfolio()
+
+# Watchlist remains local; the investment portfolio is stored in Supabase.
+PERSONAL_DATA_FILE = Path(__file__).with_name("personal_data.json")
+def load_watchlist():
+    try:
+        if PERSONAL_DATA_FILE.exists():
+            data = json.loads(PERSONAL_DATA_FILE.read_text(encoding="utf-8"))
+            return list(data.get("watchlist", []))
+    except Exception:
+        pass
+    return []
+
+_initial_watchlist = load_watchlist()
 # -----------------------------
 # Session state
 # -----------------------------
 if "watchlist" not in st.session_state:
-    st.session_state.watchlist = _initial_personal_data["watchlist"]
+    st.session_state.watchlist = _initial_watchlist
 if "portfolio" not in st.session_state:
     st.session_state.portfolio = _initial_portfolio
 if "last_analysis" not in st.session_state:
