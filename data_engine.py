@@ -820,7 +820,8 @@ class DataEngine:
             })
         return {"success": True, "data": clean, "provider": "EODHD"}
 
-    def get_market_context(self):
+    @st.cache_data(ttl=300, show_spinner=False)
+    def get_market_context(_self):
         """Return a resilient EGX30 market snapshot.
         Prefer OANOR, then EODHD's index namespace (INDX), then Yahoo's CASE30 index.
         """
@@ -830,29 +831,29 @@ class DataEngine:
             "CASE30.INDX",
         ]
 
-        if self.oanor_api_key:
-            idx = self._oanor_get("egx-api/v1/index", timeout=15)
+        if _self.oanor_api_key:
+            idx = _self._oanor_get("egx-api/v1/index", timeout=15)
             if idx.get("success"):
                 payload = idx.get("data") or {}
                 row = (payload.get("data") or payload.get("index") or payload.get("indices")) if isinstance(payload, dict) else payload
                 if isinstance(row, list):
                     row = row[0] if row else {}
                 if isinstance(row, dict):
-                    close = self._num(row.get("value") or row.get("close") or row.get("price"))
+                    close = _self._num(row.get("value") or row.get("close") or row.get("price"))
                     if close is not None:
                         return {
                             "success": True, "available": True, "symbol": "EGX30",
                             "date": row.get("date") or row.get("timestamp"),
                             "close": close,
                             "sma20": None, "sma50": None,
-                            "change_pct": self._num(row.get("change_percent") or row.get("change_pct") or row.get("changePercent")),
+                            "change_pct": _self._num(row.get("change_percent") or row.get("change_pct") or row.get("changePercent")),
                             "return20": None,
                             "regime": "بيانات EGX30 الحالية متاحة", "provider": "OANOR",
                         }
 
         # EODHD treats indices as INDX instruments, not EGX equities.
         for candidate in index_candidates:
-            history = self._get(
+            history = _self._get(
                 f"eod/{candidate}",
                 {"period": "d", "order": "d"},
                 timeout=25,
@@ -862,7 +863,7 @@ class DataEngine:
             rows = history.get("data") or []
             if not isinstance(rows, list) or len(rows) < 30:
                 continue
-            frame = self._series(rows)
+            frame = _self._series(rows)
             if len(frame) < 30:
                 continue
             close = frame["close"]
@@ -878,10 +879,10 @@ class DataEngine:
             return {
                 "success": True, "available": True, "symbol": candidate,
                 "date": str(frame.iloc[-1]["date"].date()),
-                "close": self._num(close.iloc[-1]),
-                "sma20": self._num(sma20),
-                "sma50": self._num(sma50),
-                "return20": self._num(ret20),
+                "close": _self._num(close.iloc[-1]),
+                "sma20": _self._num(sma20),
+                "sma50": _self._num(sma50),
+                "return20": _self._num(ret20),
                 "regime": regime,
             }
 
@@ -906,7 +907,7 @@ class DataEngine:
                     if i < len(closes) and closes[i] is not None
                 ]
                 if len(rows) >= 30:
-                    frame = self._series(rows)
+                    frame = _self._series(rows)
                     close = frame["close"]
                     sma20 = close.rolling(20).mean().iloc[-1]
                     sma50 = close.rolling(50).mean().iloc[-1]
@@ -920,10 +921,10 @@ class DataEngine:
                     return {
                         "success": True, "available": True, "symbol": "^CASE30",
                         "date": str(frame.iloc[-1]["date"].date()),
-                        "close": self._num(close.iloc[-1]),
-                        "sma20": self._num(sma20),
-                        "sma50": self._num(sma50),
-                        "return20": self._num(ret20),
+                        "close": _self._num(close.iloc[-1]),
+                        "sma20": _self._num(sma20),
+                        "sma50": _self._num(sma50),
+                        "return20": _self._num(ret20),
                         "regime": regime,
                     }
         except (requests.RequestException, ValueError, TypeError, KeyError):
@@ -941,18 +942,7 @@ class DataEngine:
             "regime": "بيانات المؤشر غير متاحة",
             "message": "بيانات EGX30 غير متاحة حاليًا من مزودي الأسعار. تم الاستمرار بدون قراءة المؤشر.",
         }
-        frame = self._series(history["data"])
-        close = frame["close"]
-        sma20 = close.rolling(20).mean().iloc[-1]
-        sma50 = close.rolling(50).mean().iloc[-1]
-        ret20 = close.pct_change(20).iloc[-1] * 100
-        if close.iloc[-1] > sma20 > sma50 and ret20 > 0:
-            regime = "إيجابي"
-        elif close.iloc[-1] < sma20 < sma50 and ret20 < 0:
-            regime = "ضعيف"
-        else:
-            regime = "متذبذب"
-        return {"success": True, "symbol": history["symbol"], "date": str(frame.iloc[-1]["date"].date()), "close": self._num(close.iloc[-1]), "sma20": self._num(sma20), "sma50": self._num(sma50), "return20": self._num(ret20), "regime": regime}
+
 
     @st.cache_data(ttl=600, show_spinner=False)
     def get_market_indices(_self):
