@@ -1254,17 +1254,18 @@ elif page == "⌕  تحليل":
                         st.success("تمت الإضافة.")
                 with b2:
                     if ai_enabled:
-                        with st.spinner("جاري صياغة شرح AI..."):
+                        if st.button("✨ شرح بالذكاء الاصطناعي", key=f"ai_explain_{symbol}", use_container_width=True):
                             fundamentals = result.get("fundamentals", {})
-                            st.session_state.last_fundamentals = fundamentals if fundamentals.get("success") else None
-                            ai = data_engine.ai_analysis(
-                                symbol,
-                                result,
-                                fundamentals if fundamentals.get("success") else {},
-                            )
+                            with st.spinner("جاري صياغة شرح AI..."):
+                                ai = data_engine.ai_analysis(
+                                    symbol,
+                                    result,
+                                    fundamentals if fundamentals.get("success") else {},
+                                )
                             st.session_state.last_ai = ai
+                            st.rerun()
                     else:
-                        st.info("شرح Gemini متوقف لهذه العملية.")
+                        st.info("شرح Gemini غير مفعّل؛ أضف GEMINI_API_KEY في إعدادات النشر.")
 
                 st.markdown('<div class="section">الشارت</div>', unsafe_allow_html=True)
                 chart = result["chart"].copy()
