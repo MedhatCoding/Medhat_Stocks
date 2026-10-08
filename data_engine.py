@@ -1120,7 +1120,15 @@ class DataEngine:
                         raw_change = q.get("change_pct")
                     change_pct = _self._num(raw_change)
                     volume = _self._num(q.get("volume"))
-                    if price is None or change_pct is None:
+                    if change_pct is None:
+                        previous_close = _self._num(
+                            q.get("previous_close") or q.get("previousClose")
+                            or q.get("prev_close") or q.get("prevClose")
+                        )
+                        if price is not None and previous_close not in (None, 0):
+                            change_pct = (price / previous_close - 1) * 100
+                    # Keep a valid quote even if the vendor omits percent change.
+                    if price is None:
                         continue
                     rows.append({
                         "symbol": symbol,
