@@ -277,8 +277,42 @@ class DataEngine:
             else:
                 continue
             ranked.append((rank, code, row["name"]))
+        # Arabic aliases are maintained locally so they remain searchable even
+        # when the external symbol-list endpoint is unavailable.
+        folded = query.casefold()
+        for code, arabic_name in _self.ARABIC_COMPANY_NAMES.items():
+            arabic_folded = arabic_name.casefold()
+            if folded in arabic_folded or arabic_folded in folded:
+                ranked.append((3, code, arabic_name))
         ranked.sort(key=lambda x: (x[0], x[1]))
-        return [{"symbol": code, "name": name} for _, code, name in ranked[:limit]]
+        unique = []
+        seen = set()
+        for _, code, name in ranked:
+            if code in seen:
+                continue
+            seen.add(code)
+            unique.append({"symbol": code, "name": name})
+            if len(unique) >= limit:
+                break
+        return unique
+
+    def resolve_symbol(self, query):
+        """Resolve a ticker, Arabic alias, or English company name to its ticker."""
+        raw = (query or "").strip()
+        if not raw:
+            return ""
+        code = self.display_symbol(raw)
+        if code in SHARIA_SYMBOLS or code in SHARIA_FUND_MAP:
+            return code
+        if re.fullmatch(r"[A-Z0-9]{2,8}", raw.upper()):
+            return code
+        folded = raw.casefold()
+        for symbol, arabic_name in self.ARABIC_COMPANY_NAMES.items():
+            name = arabic_name.casefold()
+            if folded in name or name in folded:
+                return symbol
+        matches = self.search_symbols(raw, limit=1)
+        return matches[0]["symbol"] if matches else code
 
     def _yahoo_index_history(self, yahoo_symbols, period="2y"):
         """Yahoo fallback for EGX index tickers; indices use ^ tickers."""
