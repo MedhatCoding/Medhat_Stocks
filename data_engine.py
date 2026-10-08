@@ -443,132 +443,170 @@ class DataEngine:
         frame = frame.dropna(subset=["date", "close"]).sort_values("date").reset_index(drop=True)
         return frame
 
-    def analyze_stock(self, symbol):
-        history = self.get_stock_history(symbol, days=365)
+    @st.cache_data(ttl=900, show_spinner=False)
+    def analyze_stock(_self, symbol):
+        history = _self.get_stock_history(symbol, days=500)
         if not history["success"] or not history["data"]:
             return {"success": False, "error": history.get("error", "لا توجد بيانات")}
 
-        frame = self._series(history["data"])
-        if len(frame) < 30:
-            return {"success": False, "error": "البيانات التاريخية المتاحة أقل من 30 جلسة"}
+        frame = _self._series(history["data"])
+        if len(frame) < 80:
+            return {"success": False, "error": "البيانات التاريخية المتاحة أقل من 80 جلسة"}
 
-        close = frame["close"]
-        volume = frame["volume"] if "volume" in frame else pd.Series(dtype=float)
-
+        close = frame["close"].astype(float)
+        volume = frame["volume"].astype(float) if "volume" in frame else pd.Series(index=frame.index, dtype=float)
         frame["sma20"] = close.rolling(20).mean()
         frame["sma50"] = close.rolling(50).mean()
         frame["sma200"] = close.rolling(200).mean()
+        ema12, ema26 = close.ewm(span=12, adjust=False).mean(), close.ewm(span=26, adjust=False).mean()
+        frame["macd"] = ema12 - ema26
+        frame["macd_signal"] = frame["macd"].ewm(span=9, adjust=False).mean()
+        frame["macd_hist"] = frame["macd"] - frame["macd_signal"]
+
         delta = close.diff()
         gain = delta.clip(lower=0).rolling(14).mean()
         loss = (-delta.clip(upper=0)).rolling(14).mean()
         rs = gain / loss.replace(0, np.nan)
         frame["rsi14"] = 100 - (100 / (1 + rs))
-        tr_parts = [
+        tr = pd.concat([
             frame["high"] - frame["low"],
             (frame["high"] - frame["close"].shift()).abs(),
             (frame["low"] - frame["close"].shift()).abs(),
-        ]
-        frame["atr14"] = pd.concat(tr_parts, axis=1).max(axis=1).rolling(14).mean()
+        ], axis=1).max(axis=1)
+        frame["atr14"] = tr.rolling(14).mean()
         frame["return_20d"] = close.pct_change(20) * 100
         frame["return_60d"] = close.pct_change(60) * 100
         frame["volatility20"] = close.pct_change().rolling(20).std() * np.sqrt(252) * 100
-        if not volume.empty:
-            frame["volume_avg20"] = volume.rolling(20).mean()
-            frame["volume_ratio"] = volume / frame["volume_avg20"]
-        else:
-            frame["volume_avg20"] = np.nan
-            frame["volume_ratio"] = np.nan
+        frame["volume_avg20"] = volume.rolling(20).mean() if not volume.empty else np.nan
+        frame["volume_ratio"] = volume / frame["volume_avg20"] if not volume.empty else np.nan
 
         latest = frame.iloc[-1]
-        last_close = self._num(latest["close"])
-        sma20 = self._num(latest.get("sma20"))
-        sma50 = self._num(latest.get("sma50"))
-        sma200 = self._num(latest.get("sma200"))
-        rsi = self._num(latest.get("rsi14"))
-        atr = self._num(latest.get("atr14"))
-        ret20 = self._num(latest.get("return_20d"))
-        ret60 = self._num(latest.get("return_60d"))
-        vol20 = self._num(latest.get("volatility20"))
-        vol_ratio = self._num(latest.get("volume_ratio"))
+        last_close = _self._num(latest["close"])
+        sma20, sma50, sma200 = map(lambda k: _self._num(latest.get(k)), ["sma20","sma50","sma200"])
+        rsi, atr = _self._num(latest.get("rsi14")), _self._num(latest.get("atr14"))
+        ret20, ret60 = _self._num(latest.get("return_20d")), _self._num(latest.get("return_60d"))
+        vol20, vol_ratio = _self._num(latest.get("volatility20")), _self._num(latest.get("volume_ratio"))
+        macd, macd_signal, macd_hist = map(lambda k: _self._num(latest.get(k)), ["macd","macd_signal","macd_hist"])
 
         recent = frame.tail(60)
-        support = self._num(recent["low"].min())
-        resistance = self._num(recent["high"].max())
+        support = _self._num(recent["low"].min())
+        resistance = _self._num(recent["high"].max())
+        atr_pct = (atr / last_close * 100) if atr and last_close else None
 
-        trend_points = 0
-        if last_close is not None and sma20 is not None:
-            trend_points += 20 if last_close > sma20 else 0
-        if last_close is not None and sma50 is not None:
-            trend_points += 20 if last_close > sma50 else 0
-        if sma20 is not None and sma50 is not None:
-            trend_points += 15 if sma20 > sma50 else 0
-        if sma50 is not None and sma200 is not None:
-            trend_points += 15 if sma50 > sma200 else 0
-        if ret20 is not None:
-            trend_points += 10 if ret20 > 0 else 0
-        if ret60 is not None:
-            trend_points += 10 if ret60 > 0 else 0
-        if rsi is not None:
-            trend_points += 10 if 45 <= rsi <= 68 else (5 if 35 <= rsi < 45 else 0)
+        # Multi-factor technical score.
+        trend = 0
+        for condition, points in [
+            (last_close is not None and sma20 is not None and last_close > sma20, 12),
+            (last_close is not None and sma50 is not None and last_close > sma50, 12),
+            (sma20 is not None and sma50 is not None and sma20 > sma50, 12),
+            (sma50 is not None and sma200 is not None and sma50 > sma200, 10),
+            (ret20 is not None and ret20 > 0, 8),
+            (ret60 is not None and ret60 > 0, 8),
+            (macd_hist is not None and macd_hist > 0, 10),
+            (rsi is not None and 45 <= rsi <= 68, 8),
+        ]:
+            trend += points
+        momentum = 0
+        if ret20 is not None: momentum += max(0, min(35, ret20 * 3))
+        if ret60 is not None: momentum += max(0, min(35, ret60 * 1.5))
+        if vol_ratio is not None and vol_ratio >= 1.15: momentum += 15
+        if macd_hist is not None and macd_hist > 0: momentum += 15
+        momentum = min(100, momentum)
 
-        risk_points = 0
-        if vol20 is not None:
-            risk_points += min(35, max(0, vol20 - 15))
-        if rsi is not None and rsi > 75:
-            risk_points += 25
-        if atr is not None and last_close:
-            risk_points += min(25, (atr / last_close) * 100)
-        if vol_ratio is not None and vol_ratio < 0.5:
-            risk_points += 15
-        risk_score = int(min(100, round(risk_points)))
-        opportunity_score = int(max(0, min(100, round(trend_points - risk_score * 0.35 + 25))))
+        risk = 0
+        if vol20 is not None: risk += min(35, max(0, vol20 - 12))
+        if rsi is not None and rsi > 75: risk += 20
+        if atr_pct is not None: risk += min(30, atr_pct * 3)
+        if vol_ratio is not None and vol_ratio < 0.5: risk += 15
+        risk_score = int(min(100, round(risk)))
 
-        if risk_score >= 70:
-            status = "مخاطر مرتفعة"
-        elif opportunity_score >= 75 and risk_score < 45:
-            status = "إيجابي"
-        elif opportunity_score >= 55:
+        # Relative strength against the Sharia benchmark EGX33.
+        rs20 = rs60 = None
+        benchmark = _self.get_market_indices()
+        egx33 = next((x for x in benchmark.get("indices", []) if x.get("symbol") == "EGX33"), None)
+        if egx33:
+            b20, b60 = _self._num(egx33.get("return20")), None
+            # The board currently exposes 20-session benchmark performance; use
+            # the stock's 60d return only as a secondary comparison when 60d
+            # benchmark history is unavailable.
+            if ret20 is not None and b20 is not None:
+                rs20 = ret20 - b20
+        relative_score = 50 if rs20 is None else max(0, min(100, 50 + rs20 * 5))
+
+        # Fundamental quality, when available, is deliberately a bonus rather
+        # than a hard requirement because some EGX names have incomplete data.
+        fundamentals = _self.get_company_snapshot(symbol)
+        fundamental_score = None
+        if fundamentals.get("success"):
+            f = fundamentals
+            checks = []
+            pe = _self._num(f.get("pe") or f.get("valuation_pe"))
+            beta = _self._num(f.get("beta"))
+            div = _self._num(f.get("dividend_yield"))
+            if pe is not None: checks.append(70 if 0 < pe <= 18 else 45 if pe <= 30 else 25)
+            if beta is not None: checks.append(70 if 0 < beta <= 1.2 else 45)
+            if div is not None: checks.append(65 if div >= 2 else 50)
+            if checks: fundamental_score = sum(checks) / len(checks)
+
+        base_score = trend * 0.50 + momentum * 0.20 + relative_score * 0.15 + (fundamental_score or 50) * 0.15
+        opportunity_score = int(max(0, min(100, round(base_score - risk_score * 0.25 + 8))))
+
+        hard_blocks = []
+        if vol_ratio is not None and vol_ratio < 0.35: hard_blocks.append("سيولة ضعيفة جدًا")
+        if last_close is not None and sma50 is not None and last_close < sma50 and ret20 is not None and ret20 < -5:
+            hard_blocks.append("اتجاه هابط قوي")
+        if atr_pct is not None and atr_pct > 9: hard_blocks.append("تذبذب مرتفع جدًا")
+        if last_close is not None and resistance and last_close >= resistance * 0.985:
+            hard_blocks.append("السعر قريب جدًا من مقاومة")
+        if rsi is not None and rsi >= 78: hard_blocks.append("تشبع شرائي")
+
+        # Dynamic levels: volatility-adjusted, never fabricated when ATR is absent.
+        entry_low = entry_high = target1 = target2 = stop = None
+        if last_close is not None and atr and atr > 0:
+            entry_low, entry_high = last_close - 0.35 * atr, last_close + 0.15 * atr
+            target1, target2 = last_close + 1.0 * atr, last_close + 2.0 * atr
+            stop = max(0.01, last_close - 1.25 * atr)
+
+        if hard_blocks:
+            status = "انتظار"
+        elif opportunity_score >= 75 and risk_score < 50:
+            status = "فرصة قوية"
+        elif opportunity_score >= 60:
             status = "مراقبة"
         else:
             status = "محايد"
 
         ml = train_and_predict(frame, feedback=adaptive_feedback())
-        chart = frame.tail(120)[["date", "close", "sma20", "sma50", "sma200"]].copy()
-        chart["date"] = chart["date"].dt.strftime("%Y-%m-%d")
+        ml_prob = _self._num((ml or {}).get("probability"))
+        confidence = None
+        if ml_prob is not None:
+            confidence = round(max(0, min(100, 0.55 * opportunity_score + 0.45 * ml_prob)), 1)
 
         return {
-            "success": True,
-            "symbol": history["symbol"],
-            "date": str(latest["date"].date()),
-            "close": last_close,
-            "open": self._num(latest.get("open")),
-            "high": self._num(latest.get("high")),
-            "low": self._num(latest.get("low")),
-            "volume": self._num(latest.get("volume")),
-            "previous_close": self._num(frame.iloc[-2]["close"]) if len(frame) > 1 else None,
-            "change_pct": ((last_close / self._num(frame.iloc[-2]["close"]) - 1) * 100) if len(frame) > 1 and self._num(frame.iloc[-2]["close"]) else None,
-            "sma20": sma20,
-            "sma50": sma50,
-            "sma200": sma200,
-            "rsi14": rsi,
-            "atr14": atr,
-            "return20": ret20,
-            "return60": ret60,
-            "volatility20": vol20,
-            "volume_ratio": vol_ratio,
-            "volatility20": vol20,
-            "atr_pct": (atr / last_close * 100) if atr and last_close else None,
-            "distance_support_pct": ((last_close - support) / last_close * 100) if last_close and support else None,
-            "trend20": (last_close / sma20 - 1) if last_close and sma20 else None,
-            "trend50": (last_close / sma50 - 1) if last_close and sma50 else None,
-            "return60": ret60,
-            "support": support,
+            "success": True, "symbol": history["symbol"],
+            "name": _self.arabic_company_name(symbol, symbol),
+            "date": str(latest["date"].date()), "close": last_close,
+            "open": _self._num(latest.get("open")), "high": _self._num(latest.get("high")),
+            "low": _self._num(latest.get("low")), "volume": _self._num(latest.get("volume")),
+            "previous_close": _self._num(frame.iloc[-2]["close"]) if len(frame)>1 else None,
+            "change_pct": ((last_close / _self._num(frame.iloc[-2]["close"]) - 1)*100) if len(frame)>1 and _self._num(frame.iloc[-2]["close"]) else None,
+            "sma20": sma20, "sma50": sma50, "sma200": sma200, "rsi14": rsi,
+            "atr14": atr, "atr_pct": atr_pct, "macd": macd, "macd_signal": macd_signal,
+            "macd_hist": macd_hist, "return20": ret20, "return60": ret60,
+            "volatility20": vol20, "volume_ratio": vol_ratio, "support": support,
             "resistance": resistance,
-            "opportunity_score": opportunity_score,
-            "risk_score": risk_score,
-            "status": status,
-            "history_rows": len(frame),
-            "chart": chart,
+            "distance_support_pct": ((last_close-support)/last_close*100) if last_close and support else None,
+            "trend20": (last_close/sma20-1) if last_close and sma20 else None,
+            "trend50": (last_close/sma50-1) if last_close and sma50 else None,
+            "relative_strength_egx33": rs20, "relative_score": round(relative_score,1),
+            "fundamental_score": round(fundamental_score,1) if fundamental_score is not None else None,
+            "opportunity_score": opportunity_score, "final_opportunity_score": opportunity_score,
+            "risk_score": risk_score, "confidence": confidence, "hard_blocks": hard_blocks,
+            "status": status, "history_rows": len(frame),
+            "entry_low": entry_low, "entry_high": entry_high, "target1": target1,
+            "target2": target2, "stop": stop,
+            "chart": frame.tail(120)[["date","close","sma20","sma50","sma200"]].assign(
+                date=lambda x: x["date"].dt.strftime("%Y-%m-%d")),
             "ml": ml,
         }
 
