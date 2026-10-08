@@ -666,15 +666,23 @@ elif page == "◉  السوق":
         idxdf["القيمة"]=idxdf["close"].map(money)
         idxdf["التغير اليومي"]=idxdf["change_pct"].map(lambda x:f"{float(x):+.2f}%" if x is not None else "—")
         idxdf["التغير 20 جلسة"]=idxdf["return20"].map(lambda x:f"{float(x):+.2f}%" if x is not None else "—")
-        st.dataframe(idxdf[["المؤشر","القيمة","التغير اليومي","التغير 20 جلسة"]],use_container_width=True,hide_index=True)
-        if len(indices)<4:
-            st.caption("تظهر فقط المؤشرات التي تتوفر لها بيانات فعلية؛ لا يتم اختراع أرقام عند تعذر المصدر.")
+        idxdf["الحالة"]=idxdf["regime"].fillna("—")
+        st.dataframe(
+            idxdf[["المؤشر","القيمة","التغير اليومي","التغير 20 جلسة","الحالة"]],
+            use_container_width=True, hide_index=True
+        )
+        missing=indices_board.get("missing",[])
+        if missing:
+            st.caption("المؤشرات التي لم يتوفر لها مصدر بيانات موثوق حاليًا: " + "، ".join(missing))
+        st.caption(f"لوحة المؤشرات: {len(indices)} من {indices_board.get('expected_count', len(indices))} مؤشرات رئيسية متاحة. EGX33 Shariah ضمن اللوحة.")
     else:
         st.info("لا توجد بيانات مؤشرات متاحة حاليًا. اضغط تحديث السوق لإعادة المحاولة.")
 
+    # Market regime remains based on EGX30, while the table above exposes every
+    # supported EGX benchmark including EGX33 Shariah.
     if market.get("success") and market.get("available"):
         st.markdown(
-            f'<div class="premarket"><div class="premarket-title">EGX30 • {market.get("regime","—")}</div>'
+            f'<div class="premarket"><div class="premarket-title">حالة السوق • EGX30</div>'
             f'<div class="premarket-time">آخر جلسة: {market.get("date","—")}</div>'
             f'<div class="premarket-body">القيمة: <b>{money(market.get("close"))}</b> • '
             f'SMA20: <b>{money(market.get("sma20"))}</b> • SMA50: <b>{money(market.get("sma50"))}</b> • '
@@ -682,7 +690,7 @@ elif page == "◉  السوق":
             unsafe_allow_html=True,
         )
     else:
-        st.info("بيانات EGX30 غير متاحة الآن؛ لا يتم عرض قيمة تقديرية.")
+        st.info("تعذر تحديد حالة السوق من EGX30 حاليًا؛ سيتم الاستمرار بدون اختلاق قراءة للمؤشر.")
 
     st.markdown('<div class="section">اتساع السوق</div>', unsafe_allow_html=True)
     if snapshot.get("success"):
