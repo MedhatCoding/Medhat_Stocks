@@ -71,13 +71,21 @@ def _fit_mlp(X,Y,seed=42,epochs=450,lr=0.012):
         for i in range(len(W)-1):
             z=A[-1]@W[i]+B[i]; Z.append(z); A.append(_relu(z))
         z=A[-1]@W[-1]+B[-1]; Z.append(z); A.append(_sigmoid(z))
-        dz=(A[-1]-Y[:,None])
+        # Keep targets and layer gradients strictly 2-D to avoid broadcasting failures.
+        dz = np.asarray(A[-1] - np.asarray(Y).reshape(-1, 1), dtype=float)
         for i in reversed(range(len(W))):
-            a_prev=A[i]
-            W[i]-=lr*(a_prev.T@dz/len(Y))
-            B[i]-=lr*dz.mean(axis=0)
-            if i>0:
-                dz=(dz@W[i].T)*(Z[i-1]>0)
+            a_prev = A[i]
+            grad_w = (a_prev.T @ dz) / max(1, len(Y))
+            grad_b = dz.mean(axis=0)
+            # Propagate through current weights before updating them.
+            prev_dz = (dz @ W[i].T) if i > 0 else None
+            W[i] -= lr * grad_w
+            B[i] -= lr * grad_b
+            if i > 0:
+                relu_mask = np.asarray(Z[i - 1]) > 0
+                if prev_dz.shape != relu_mask.shape:
+                    prev_dz = np.reshape(prev_dz, relu_mask.shape)
+                dz = prev_dz * relu_mask
     def predict(X2):
         a=X2
         for i in range(len(W)-1): a=_relu(a@W[i]+B[i])
@@ -93,7 +101,7 @@ def train_and_predict(frame,horizon=10,target_pct=3.0,stop_pct=4.0,feedback=None
     split=max(30,int(len(idx)*0.8))
     fit,val=idx[:split],idx[split:]
     mu=x.iloc[fit].mean(); sd=x.iloc[fit].std().replace(0,1).fillna(1)
-    X=((x-mu)/sd).to_numpy(float); Y=y.to_numpy(float)
+    X=((x-mu)/sd).to_numpy(float); Y=y.to_numpy(float).reshape(-1)
     logit=_fit_logistic(X[fit],Y[fit])
     mlp=_fit_mlp(X[fit],Y[fit])
     latest=len(frame)-1
