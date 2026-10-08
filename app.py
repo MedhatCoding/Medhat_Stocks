@@ -1123,20 +1123,27 @@ elif page == "⌕  تحليل":
     )
     run_analysis = st.button("🔎 تحليل السهم", key="run_stock_analysis", use_container_width=True, type="primary")
 
-    if run_analysis or autorun_analysis:
+    if run_analysis or autorun_analysis or (
+        st.session_state.get("last_analysis")
+        and data_engine.display_symbol(st.session_state.last_analysis.get("symbol", "")) == data_engine.display_symbol(query)
+    ):
         symbol_query = (query or "").strip()
         if not symbol_query:
             st.warning("اكتب رمز السهم أو اسم الشركة أولًا.")
         else:
-            with st.spinner("جاري تحميل البيانات وتحليل السهم..."):
-                result = data_engine.get_full_analysis(symbol_query)
+            if run_analysis or autorun_analysis:
+                with st.spinner("جاري تحميل البيانات وتحليل السهم..."):
+                    result = data_engine.get_full_analysis(symbol_query)
+            else:
+                result = st.session_state.get("last_analysis")
             if not result or not result.get("success"):
                 st.warning(friendly_error((result or {}).get("error", "تعذر تحليل السهم لعدم توفر بيانات كافية.")))
             else:
-                st.session_state.last_analysis = result
-                st.session_state.last_ai = None
-                # IMPORTANT: analysis_query belongs to st.text_input and must never be
-                # assigned after that widget has been created. Keep navigation state separate.
+                if run_analysis or autorun_analysis:
+                    st.session_state.last_analysis = result
+                    st.session_state.last_ai = None
+                    fundamentals = result.get("fundamentals") or {}
+                    st.session_state.last_fundamentals = fundamentals if fundamentals.get("success") else None
                 symbol = result["symbol"].replace(".EGX", "")
                 sharia_ok = sharia_status(symbol)
 
