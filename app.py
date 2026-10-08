@@ -613,9 +613,9 @@ if page == "⌂  الرئيسية":
         market_regime = market.get("regime", "غير متاح")
         st.markdown(
             f'<div class="premarket"><div class="premarket-title">تقرير ما قبل الافتتاح</div>'
-            f'<div class="premarket-time">آخر جلسة مكتملة: {premarket.get("latest_session_date","—")} • '
+            f'<div class="premarket-time">آخر جلسة مكتملة: {html.escape(str(premarket.get("latest_session_date") or "—"))} • '
             f'وقت القاهرة: {premarket.get("time","—")}</div>'
-            f'<div class="premarket-body">حالة EGX30: <b>{market_regime}</b> • '
+            f'<div class="premarket-body">حالة EGX30: <b>{html.escape(str(market_regime))}</b> • '
             f'قيمة المؤشر: <b>{money(market.get("close"))}</b> • '
             f'تغير 20 جلسة: <b>{pct(market.get("return20"))}</b><br>'
             f'الفرص المؤهلة في الفحص: <b>{len(premarket.get("opportunities", []))}</b> • '
@@ -776,7 +776,7 @@ elif page == "◉  السوق":
     if market.get("success") and market.get("available"):
         st.markdown(
             f'<div class="premarket"><div class="premarket-title">حالة السوق • EGX30</div>'
-            f'<div class="premarket-time">آخر جلسة: {market.get("date","—")}</div>'
+            f'<div class="premarket-time">آخر جلسة: {html.escape(str(market.get("date") or "—"))}</div>'
             f'<div class="premarket-body">القيمة: <b>{money(market.get("close"))}</b> • '
             f'SMA20: <b>{money(market.get("sma20"))}</b> • SMA50: <b>{money(market.get("sma50"))}</b> • '
             f'20 جلسة: <b>{pct(market.get("return20"))}</b></div></div>',
@@ -1177,7 +1177,7 @@ elif page == "⌕  تحليل":
 
                 st.markdown(
                     f'<div class="hero"><div class="hero-title">{html.escape(company_display_name(result, "اسم الشركة غير متاح"))}</div>'
-                    f'<div class="hero-sub">رمز التداول: {symbol} • آخر جلسة متاحة: {result["date"]}</div>'
+                    f'<div class="hero-sub">رمز التداول: {symbol} • آخر جلسة متاحة: {html.escape(str(result.get("date") or "—"))}</div>'
                     f'<span class="badge {status_class}">{status_text}</span></div>',
                     unsafe_allow_html=True,
                 )
