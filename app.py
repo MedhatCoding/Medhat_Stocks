@@ -689,11 +689,42 @@ elif page == "◉  السوق":
     if st.button("↻ تحديث السوق", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+    # Fetch each market component independently: one provider failure must not
+    # prevent the rest of the market screen from rendering.
+    market = {"success": False, "available": False, "regime": "غير متاح", "close": None, "date": None}
+    snapshot = {"success": False, "count": 0, "rows": [], "gainers": [], "losers": [], "volume_leaders": []}
+    indices_board = {"success": False, "indices": [], "missing": [], "expected_count": 0}
+    allocation = {}
+    market_errors = []
     with st.spinner("جاري تجميع بيانات السوق والمؤشرات..."):
-        market=data_engine.get_market_context()
-        snapshot=data_engine.get_market_snapshot(limit=len(SHARIA_SYMBOLS))
-        indices_board=data_engine.get_market_indices()
-        allocation=data_engine.get_asset_allocation_context()
+        try:
+            market = data_engine.get_market_context() or market
+        except Exception:
+            market_errors.append("حالة المؤشر")
+        try:
+            snapshot = data_engine.get_market_snapshot(limit=len(SHARIA_SYMBOLS)) or snapshot
+        except Exception:
+            market_errors.append("أسعار الأسهم")
+        try:
+            indices_board = data_engine.get_market_indices() or indices_board
+        except Exception:
+            market_errors.append("المؤشرات")
+        try:
+            allocation = data_engine.get_asset_allocation_context() or {}
+        except Exception:
+            market_errors.append("بيانات التوزيع والموسمية")
+
+    available_quotes = int(snapshot.get("count") or 0)
+    available_indices = len(indices_board.get("indices") or []) if indices_board.get("success") else 0
+    st.markdown(
+        '<div class="m-card-grid">'
+        f'{app_card("أسهم بأسعار متاحة", available_quotes, f"من {len(SHARIA_SYMBOLS)} سهمًا في المرجع الشرعي")}'
+        f'{app_card("مؤشرات متاحة", available_indices, f"من {indices_board.get("expected_count", 0)} مؤشرات")}'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    if market_errors:
+        st.caption("بعض أجزاء لوحة السوق لم تُحمّل: " + "، ".join(market_errors) + ". بقية البيانات المتاحة معروضة أدناه.")
 
     st.markdown('<div class="section">مؤشرات البورصة المصرية</div>', unsafe_allow_html=True)
     indices=indices_board.get("indices",[]) if indices_board.get("success") else []
