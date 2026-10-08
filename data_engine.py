@@ -1098,7 +1098,9 @@ class DataEngine:
         filters = [["exchange", "=", _self.EGX_EXCHANGE], ["code", "in", SHARIA_SYMBOLS], ["refund_5d_p", "<", 0]]
         screen = _self._get("screener", {"filters": json.dumps(filters, ensure_ascii=False), "sort": "refund_5d_p.asc", "limit": 100}, timeout=40)
         candidates = (screen.get("data") or {}).get("data", []) if screen.get("success") else []
-        if not candidates:\n            # Protect API quotas if Screener is unavailable.\n            candidates = [{"code": s} for s in SHARIA_SYMBOLS[:20]]
+        if not candidates:
+            # Protect API quotas if Screener is unavailable.
+            candidates = [{"code": s} for s in SHARIA_SYMBOLS[:20]]
         # Close older recommendations first so the next ML run can learn from real outcomes.
         try:
             from recommendation_journal import evaluate_open
