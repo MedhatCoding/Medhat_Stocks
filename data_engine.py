@@ -279,6 +279,35 @@ class DataEngine:
         ranked.sort(key=lambda x: (x[0], x[1]))
         return [{"symbol": code, "name": name} for _, code, name in ranked[:limit]]
 
+    def _yahoo_index_history(self, yahoo_symbols, period="2y"):
+        """Yahoo fallback for EGX index tickers; indices use ^ tickers."""
+        for yahoo_symbol in yahoo_symbols:
+            try:
+                response = requests.get(
+                    f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}",
+                    params={"range": period, "interval": "1d", "events": "history"},
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=20,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                item = ((payload.get("chart") or {}).get("result") or [None])[0]
+                if not item:
+                    continue
+                timestamps = item.get("timestamp") or []
+                quote = ((item.get("indicators") or {}).get("quote") or [{}])[0]
+                closes = quote.get("close") or []
+                rows = []
+                for i, ts in enumerate(timestamps):
+                    if i >= len(closes) or closes[i] is None:
+                        continue
+                    rows.append({"date": datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d"), "close": closes[i]})
+                if rows:
+                    return {"success": True, "data": rows, "provider": "Yahoo Finance"}
+            except (requests.RequestException, ValueError, TypeError, KeyError):
+                continue
+        return {"success": False, "data": []}
+
     def _yahoo_history(self, symbol, period="2y"):
         """Fallback EGX daily history via Yahoo Finance when EODHD is unavailable."""
         code = self.display_symbol(symbol)
@@ -824,14 +853,14 @@ class DataEngine:
     def get_market_indices(_self):
         """Return the main EGX indices, with EGX33/Shariah treated as first-class."""
         specs = [
-            {"name":"EGX30","symbol":"EGX30","candidates":["EGX30.INDX","CASE30.INDX","CASE30"]},
-            {"name":"EGX33 Shariah","symbol":"EGX33","candidates":["EGX33.INDX","EGX33"]},
-            {"name":"EGX35-LV","symbol":"EGX35-LV","candidates":["EGX35LV.INDX","EGX35-LV.INDX","EGX35LV"]},
-            {"name":"EGX70 EWI","symbol":"EGX70EWI","candidates":["EGX70EWI.INDX","EGX70.INDX","CCSI.INDX"]},
-            {"name":"EGX100 EWI","symbol":"EGX100EWI","candidates":["EGX100EWI.INDX","EGX100.INDX","EGX100"]},
-            {"name":"EGX30 Capped","symbol":"EGX30CAP","candidates":["EGX30CAP.INDX","EGX30CAP"]},
-            {"name":"EGX30-TR","symbol":"EGX30TR","candidates":["EGX30TR.INDX","EGX30TR"]},
-            {"name":"TAMAYUZ","symbol":"TAMAYUZ","candidates":["TAMAYUZ.INDX","TAMAYUZ"]},
+            {"name":"EGX30","symbol":"EGX30","candidates":["EGX30.INDX","CASE30.INDX","CASE30"],"yahoo":["%5ECASE30"]},
+            {"name":"EGX33 Shariah","symbol":"EGX33","candidates":["EGX33.INDX","EGX33"],"yahoo":["%5EEGX33.CA","%5EEGX33"]},
+            {"name":"EGX35-LV","symbol":"EGX35-LV","candidates":["EGX35LV.INDX","EGX35-LV.INDX","EGX35LV"],"yahoo":["%5EEGX35LV.CA","%5EEGX35LV"]},
+            {"name":"EGX70 EWI","symbol":"EGX70EWI","candidates":["EGX70EWI.INDX","EGX70.INDX","CCSI.INDX"],"yahoo":["%5EEGX70EWI.CA","%5EEGX70EWI","%5EEGX70"]},
+            {"name":"EGX100 EWI","symbol":"EGX100EWI","candidates":["EGX100EWI.INDX","EGX100.INDX","EGX100"],"yahoo":["%5EEGX100EWI.CA","%5EEGX100EWI","%5EEGX100"]},
+            {"name":"EGX30 Capped","symbol":"EGX30CAP","candidates":["EGX30CAP.INDX","EGX30CAP"],"yahoo":["%5EEGX30CAP.CA","%5EEGX30CAP"]},
+            {"name":"EGX30-TR","symbol":"EGX30TR","candidates":["EGX30TR.INDX","EGX30TR"],"yahoo":["%5EEGX30TR.CA","%5EEGX30TR"]},
+            {"name":"TAMAYUZ","symbol":"TAMAYUZ","candidates":["TAMAYUZ.INDX","TAMAYUZ"],"yahoo":["%5ETAMAYUZ.CA","%5ETAMAYUZ"]},
         ]
 
         def calc(rows):
@@ -906,18 +935,13 @@ class DataEngine:
                             item["provider"] = "EODHD"
                             break
 
-            # Yahoo is a last-resort historical source for index symbols.
+            # Yahoo is a last-resort historical source for verified index tickers.
             if item is None:
-                for candidate in spec["candidates"]:
-                    try:
-                        y = _self._yahoo_history(candidate, period="2y")
-                        if y.get("success"):
-                            item = calc(y.get("data", []))
-                            if item:
-                                item["provider"] = "Yahoo Finance"
-                                break
-                    except Exception:
-                        continue
+                y = _self._yahoo_index_history(spec.get("yahoo", []), period="2y")
+                if y.get("success"):
+                    item = calc(y.get("data", []))
+                    if item:
+                        item["provider"] = "Yahoo Finance"
 
             if item:
                 indices.append({
