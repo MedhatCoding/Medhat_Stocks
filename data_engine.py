@@ -1413,6 +1413,25 @@ class DataEngine:
         setup["seasonality_score"] = seasonality_score
         setup["seasonality"] = seasonality
         setup["final_opportunity_score"] = max(0, min(100, round(float(setup.get("final_opportunity_score", setup.get("opportunity_score", 50))) + (seasonality_score - 50) * 0.12)))
+
+        # Keep technical research available for transparency, but never present an
+        # actionable setup for a stock outside the configured Sharia reference.
+        if not sharia:
+            technical["status"] = "غير مؤهل شرعيًا"
+            technical["opportunity_score"] = 0
+            setup.update({
+                "final_opportunity_score": 0,
+                "opportunity_score": 0,
+                "setup": "غير مؤهل شرعيًا",
+                "entry_reference": None,
+                "entry_low": None,
+                "entry_high": None,
+                "target1": None,
+                "target2": None,
+                "stop": None,
+                "invalidation": None,
+                "risk_reward": None,
+            })
         return {**technical, "sharia_compliant": sharia, "sharia_fund": bool(fund_info), "fund_info": fund_info or {},
                 "gold_funds": GOLD_FUNDS, "asset_allocation": self.get_asset_allocation_context(), "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "fundamentals": fundamentals if fundamentals.get("success") else {}, "news": news_rows, **setup}
 
