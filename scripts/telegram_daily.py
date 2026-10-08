@@ -15,6 +15,59 @@ MIN_REBOUND = 45
 MAX_RISK = 65
 
 
+def portfolio_from_env():
+    """Read private portfolio settings from GitHub Actions secret.
+    Format: JSON array: [{"symbol":"COMI","qty":100,"avg":55.2}, ...]
+    """
+    raw = os.getenv("PORTFOLIO_JSON", "").strip()
+    if not raw:
+        return []
+    try:
+        value = __import__("json").loads(raw)
+        return value if isinstance(value, list) else []
+    except Exception:
+        print("Invalid PORTFOLIO_JSON; skipping personal portfolio section.")
+        return []
+
+
+def build_portfolio_report(engine, market):
+    positions = portfolio_from_env()
+    if not positions:
+        return ["💼 <b>توصيات المحفظة</b>", "لم يتم ربط المحفظة الشخصية بالتقرير التلقائي بعد."]
+
+    total_value = 0.0
+    priced = []
+    for pos in positions:
+        price_result = engine.get_latest_price(pos.get("symbol"))
+        price = price_result.get("close") if price_result.get("success") else None
+        qty = float(pos.get("qty") or 0)
+        avg = float(pos.get("avg") or 0)
+        value = qty * float(price) if price is not None else 0
+        total_value += value
+        priced.append((pos, price, value))
+
+    lines = ["💼 <b>توصيات المحفظة</b>"]
+    for pos, price, value in priced:
+        try:
+            advice = __import__("portfolio_advisor").advise(
+                pos, market=market, portfolio_value=total_value
+            )
+        except Exception as exc:
+            print(f"Portfolio advice failed for {pos.get('symbol')}: {exc}")
+            continue
+        action = advice.get("action", "بيانات غير كافية")
+        emoji = {"زيادة":"🟢", "احتفاظ":"🟡", "بيع":"🔴"}.get(action, "⚪")
+        pnl = advice.get("pnl_pct")
+        pnl_text = "—" if pnl is None else f"{float(pnl):+.2f}%"
+        lines.append(
+            f"{emoji} <b>{html.escape(str(advice.get('name') or advice.get('symbol')))}</b> "
+            f"({html.escape(str(advice.get('symbol')))}): <b>{action}</b> • "
+            f"ر/خ {pnl_text} • وزن {float(advice.get('weight_pct') or 0):.1f}%"
+        )
+        lines.append(f"↳ {html.escape(str(advice.get('reason') or '—'))}")
+    return lines
+
+
 def send_telegram(token, chat_id, message):
     response = requests.post(
         f"https://api.telegram.org/bot{token}/sendMessage",
@@ -96,6 +149,8 @@ def main():
             )
 
     lines += ["", f"🎯 <b>الفرص المؤهلة: {len(rows)}</b>"]
+
+    lines += [""] + build_portfolio_report(engine, market) + [""]
 
     for index, row in enumerate(rows[:5], 1):
         symbol = html.escape(str(row.get("symbol", "—")))
