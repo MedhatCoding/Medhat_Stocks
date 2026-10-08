@@ -220,11 +220,11 @@ class DataEngine:
 
     def get_live_quote(self, symbol):
         code = self.display_symbol(symbol)
-        result = self._oanor_get("egx-api/v1/quote", {"symbol": code}, timeout=15)
+        result = self._oanor_get("egx-api/v1/quote", {"codes": code}, timeout=15)
         if not result["success"]:
             return result
         data = result["data"]
-        rows = data.get("data") if isinstance(data, dict) else data
+        rows = (data.get("quotes") or data.get("data")) if isinstance(data, dict) else data
         if isinstance(rows, dict):
             rows = [rows]
         if not rows:
@@ -697,9 +697,9 @@ class DataEngine:
                             "date": row.get("date") or row.get("timestamp"),
                             "close": close,
                             "sma20": None, "sma50": None,
-                            "change_pct": self._num(row.get("change_pct") or row.get("changePercent") or row.get("change")),
+                            "change_pct": self._num(row.get("change_percent") or row.get("change_pct") or row.get("changePercent")),
                             "return20": None,
-                            "regime": "بيانات EGX30 الحالية متاحة",
+                            "regime": "بيانات EGX30 الحالية متاحة", "provider": "OANOR",
                         }
 
         # EODHD treats indices as INDX instruments, not EGX equities.
@@ -808,98 +808,95 @@ class DataEngine:
 
     @st.cache_data(ttl=600, show_spinner=False)
     def get_market_indices(_self):
-        """Build a resilient EGX index board using OANOR, EODHD and Yahoo fallbacks."""
-        definitions=[
-            ("EGX30",["EGX30.INDX","CASE30.INDX"],["^CASE30"]),
-            ("EGX70 EWI",["EGX70EWI.INDX","EGX70_EWI.INDX"],["^EGX70EWI.CA","^EGX70EWI"]),
-            ("EGX100 EWI",["EGX100EWI.INDX","EGX100_EWI.INDX"],["^EGX100EWI.CA","^EGX100EWI"]),
-            ("EGX30 CAP",["EGX30CAP.INDX","EGX30_CAP.INDX"],["^EGX30CAP.CA","^EGX30CAP"]),
-            ("EGX30-TR",["EGX30TR.INDX","EGX30_TR.INDX"],["^EGX30TR.CA","^EGX30TR"]),
-            ("EGX35-LV",["EGX35LV.INDX","EGX35_LV.INDX"],["^EGX35LV.CA","^EGX35LV"]),
-            ("EGX SHARIAH",["EGXSHARIAH.INDX","EGX33SHARIAH.INDX","EGX_SHARIAH.INDX"],["^EGX33.CA","^EGXSHARIAH.CA"]),
-            ("TAMAYUZ",["TAMAYUZ.INDX"],["^TAMAYUZ.CA"]),
-        ]
-        result=[]
-        for name,eod_candidates,yahoo_candidates in definitions:
-            item=None
-            if name=="EGX30":
-                mc=_self.get_market_context()
-                if mc.get("success") and mc.get("available") and mc.get("close") is not None:
-                    item={"name":name,"symbol":mc.get("symbol","EGX30"),"close":mc.get("close"),
-                          "change_pct":mc.get("change_pct"),"return20":mc.get("return20"),"date":mc.get("date")}
-            for symbol in eod_candidates:
-                if item: break
-                try:
-                    h=_self._get(f"eod/{symbol}",{"period":"d","order":"d"},timeout=15)
-                    rows=h.get("data") or [] if h.get("success") else []
-                    frame=_self._series(rows)
-                    if len(frame)>=2:
-                        close=_self._num(frame["close"].iloc[-1]); prev=_self._num(frame["close"].iloc[-2])
-                        if close is not None and prev not in (None,0):
-                            item={"name":name,"symbol":symbol,"close":close,"change_pct":(close/prev-1)*100,
-                                  "return20":_self._num(frame["close"].pct_change(20).iloc[-1]*100) if len(frame)>=21 else None,
-                                  "date":str(frame.iloc[-1]["date"].date())}
-                            break
-                except Exception: pass
-            if not item:
-                for symbol in yahoo_candidates:
-                    try:
-                        r=requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
-                                       params={"range":"2y","interval":"1d","events":"history"},
-                                       headers={"User-Agent":"Mozilla/5.0"},timeout=15)
-                        r.raise_for_status()
-                        obj=((r.json().get("chart") or {}).get("result") or [None])[0]
-                        if not obj: continue
-                        ts=obj.get("timestamp") or []
-                        q=((obj.get("indicators") or {}).get("quote") or [{}])[0]
-                        closes=q.get("close") or []
-                        rows=[{"date":datetime.fromtimestamp(ts[i],timezone.utc).strftime("%Y-%m-%d"),"close":closes[i]}
-                              for i in range(min(len(ts),len(closes))) if closes[i] is not None]
-                        frame=_self._series(rows)
-                        if len(frame)>=2:
-                            close=_self._num(frame["close"].iloc[-1]); prev=_self._num(frame["close"].iloc[-2])
-                            if close is not None and prev not in (None,0):
-                                item={"name":name,"symbol":symbol,"close":close,"change_pct":(close/prev-1)*100,
-                                      "return20":_self._num(frame["close"].pct_change(20).iloc[-1]*100) if len(frame)>=21 else None,
-                                      "date":str(frame.iloc[-1]["date"].date())}
-                                break
-                    except Exception: pass
-            if item: result.append(item)
-        return {"success":bool(result),"count":len(result),"indices":result}
+        """Return verified EGX index data without brute-forcing unknown symbols."""
+        result = []
+        mc = _self.get_market_context()
+        if mc.get("success") and mc.get("available") and mc.get("close") is not None:
+            result.append({
+                "name": "EGX30",
+                "symbol": "EGX30",
+                "close": mc.get("close"),
+                "change_pct": mc.get("change_pct"),
+                "return20": mc.get("return20"),
+                "date": mc.get("date"),
+                "provider": mc.get("provider", "OANOR"),
+            })
+        return {"success": bool(result), "count": len(result), "indices": result}
 
-    def get_market_snapshot(self, limit=96):
-        """Build a compact EGX market board from available daily quotes."""
-        rows = []
+    @st.cache_data(ttl=300, show_spinner=False)
+    def get_market_snapshot(_self, limit=96):
+        """Build the Sharia EGX market board from OANOR live quotes in batches."""
         symbols = list(dict.fromkeys(SHARIA_SYMBOLS))[:max(1, int(limit))]
-        for symbol in symbols:
-            try:
-                hist = self.get_stock_history(symbol, days=35)
-                data = hist.get("data", []) if hist.get("success") else []
-                if len(data) < 2:
+        allowed = set(_self.display_symbol(s) for s in symbols)
+        rows = []
+
+        if _self.oanor_api_key:
+            for i in range(0, len(symbols), 20):
+                batch = symbols[i:i + 20]
+                result = _self._oanor_get(
+                    "egx-api/v1/quote",
+                    {"codes": ",".join(_self.display_symbol(s) for s in batch)},
+                    timeout=20,
+                )
+                if not result.get("success"):
                     continue
-                frame = self._series(data)
-                if len(frame) < 2:
+                payload = result.get("data") or {}
+                quotes = payload.get("quotes") if isinstance(payload, dict) else payload
+                if not isinstance(quotes, list):
                     continue
-                last = frame.iloc[-1]
-                prev = frame.iloc[-2]
-                close = self._num(last.get("close"))
-                previous = self._num(prev.get("close"))
-                volume = self._num(last.get("volume"))
-                if close is None or previous in (None, 0):
+                for q in quotes:
+                    if not isinstance(q, dict):
+                        continue
+                    symbol = str(q.get("ticker") or q.get("code") or "").upper()
+                    if symbol not in allowed:
+                        continue
+                    price = _self._num(q.get("price") or q.get("close"))
+                    change_pct = _self._num(q.get("change_percent") or q.get("changePercent"))
+                    volume = _self._num(q.get("volume"))
+                    if price is None or change_pct is None:
+                        continue
+                    rows.append({
+                        "symbol": symbol,
+                        "name": _self.arabic_company_name(symbol, q.get("company") or symbol),
+                        "name_en": q.get("company") or symbol,
+                        "close": price,
+                        "change_pct": change_pct,
+                        "volume": volume,
+                        "volume_ratio": None,
+                        "provider": "OANOR",
+                    })
+
+        if not rows:
+            for symbol in symbols:
+                try:
+                    hist = _self.get_stock_history(symbol, days=35)
+                    data = hist.get("data", []) if hist.get("success") else []
+                    if len(data) < 2:
+                        continue
+                    frame = _self._series(data)
+                    if len(frame) < 2:
+                        continue
+                    last, prev = frame.iloc[-1], frame.iloc[-2]
+                    close = _self._num(last.get("close"))
+                    previous = _self._num(prev.get("close"))
+                    volume = _self._num(last.get("volume"))
+                    if close is None or previous in (None, 0):
+                        continue
+                    change = (close / previous - 1) * 100
+                    avg_vol = frame["volume"].tail(20).mean() if "volume" in frame else None
+                    volume_ratio = (volume / avg_vol) if volume is not None and avg_vol and avg_vol > 0 else None
+                    rows.append({
+                        "symbol": symbol,
+                        "name": _self.arabic_company_name(symbol, symbol),
+                        "close": close,
+                        "change_pct": change,
+                        "volume": volume,
+                        "volume_ratio": volume_ratio,
+                        "provider": hist.get("provider", "EODHD"),
+                    })
+                except Exception:
                     continue
-                change = (close / previous - 1) * 100
-                avg_vol = frame["volume"].tail(20).mean() if "volume" in frame else None
-                volume_ratio = (volume / avg_vol) if volume is not None and avg_vol and avg_vol > 0 else None
-                rows.append({
-                    "symbol": symbol,
-                    "name": self.arabic_company_name(symbol, symbol),
-                    "close": close,
-                    "change_pct": change,
-                    "volume": volume,
-                    "volume_ratio": volume_ratio,
-                })
-            except Exception:
-                continue
+
         rows.sort(key=lambda x: x["change_pct"], reverse=True)
         gainers = rows[:5]
         losers = sorted(rows, key=lambda x: x["change_pct"])[:5]
@@ -908,10 +905,11 @@ class DataEngine:
         declines = sum(1 for x in rows if x["change_pct"] < -0.05)
         unchanged = len(rows) - advances - declines
         return {
-            "success": True, "count": len(rows), "rows": rows,
+            "success": bool(rows), "count": len(rows), "rows": rows,
             "gainers": gainers, "losers": losers, "volume_leaders": volume_leaders,
             "advances": advances, "declines": declines, "unchanged": unchanged,
             "breadth": round(advances / len(rows) * 100, 1) if rows else None,
+            "provider": rows[0].get("provider") if rows else None,
         }
 
     def _opportunity_setup(self, analysis, market=None, news_score=None, seasonality_score=50):
