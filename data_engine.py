@@ -244,11 +244,26 @@ class DataEngine:
         if not result["success"]:
             return result
         data = result["data"]
-        rows = (data.get("quotes") or data.get("data")) if isinstance(data, dict) else data
+        # OANOR responses may wrap quote data as {"data":{"quotes":[...]}}
+        # or return a single quote directly under "data". Unwrap both shapes.
+        rows = data
+        for _ in range(3):
+            if isinstance(rows, dict):
+                if isinstance(rows.get("quotes"), list):
+                    rows = rows["quotes"]
+                    break
+                if "data" in rows:
+                    rows = rows["data"]
+                    continue
+                if any(key in rows for key in ("price", "close", "last_price", "last")):
+                    rows = [rows]
+                    break
+            else:
+                break
         if isinstance(rows, dict):
             rows = [rows]
-        if not rows:
-            return {"success": False, "error": "لا توجد تسعيرة حية"}
+        if not isinstance(rows, list) or not rows:
+            return {"success": False, "error": "لا توجد تسعيرة حية في استجابة OANOR"}
         return {"success": True, "data": rows[0]}
 
     @st.cache_data(ttl=3600, show_spinner=False)
@@ -1107,7 +1122,22 @@ class DataEngine:
                 if not result.get("success"):
                     continue
                 payload = result.get("data") or {}
-                quotes = (payload.get("quotes") or payload.get("data")) if isinstance(payload, dict) else payload
+                # Handle both documented-style {"quotes":[...]} and nested
+                # envelopes such as {"data":{"quotes":[...]}}.
+                quotes = payload
+                for _ in range(3):
+                    if isinstance(quotes, dict):
+                        if isinstance(quotes.get("quotes"), list):
+                            quotes = quotes["quotes"]
+                            break
+                        if isinstance(quotes.get("data"), (dict, list)):
+                            quotes = quotes["data"]
+                            continue
+                        if any(key in quotes for key in ("ticker", "code", "symbol", "price", "close", "last_price")):
+                            quotes = [quotes]
+                            break
+                    else:
+                        break
                 if isinstance(quotes, dict):
                     quotes = [quotes]
                 if not isinstance(quotes, list):
