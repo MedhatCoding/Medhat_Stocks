@@ -1215,13 +1215,19 @@ class DataEngine:
                 except Exception:
                     continue
 
-        rows.sort(key=lambda x: x["change_pct"], reverse=True)
-        gainers = rows[:5]
-        losers = sorted(rows, key=lambda x: x["change_pct"])[:5]
+        # Some quote plans omit daily percent change. Keep their valid prices,
+        # but exclude unknown changes from gainers/losers and market breadth.
+        changed_rows = [x for x in rows if _self._num(x.get("change_pct")) is not None]
+        rows.sort(key=lambda x: _self._num(x.get("change_pct")) if _self._num(x.get("change_pct")) is not None else float("-inf"), reverse=True)
+        gainers = [x for x in changed_rows if _self._num(x.get("change_pct")) > 0.05][:5]
+        losers = sorted(
+            [x for x in changed_rows if _self._num(x.get("change_pct")) < -0.05],
+            key=lambda x: _self._num(x.get("change_pct")),
+        )[:5]
         volume_leaders = sorted(rows, key=lambda x: x.get("volume") or 0, reverse=True)[:5]
-        advances = sum(1 for x in rows if x["change_pct"] > 0.05)
-        declines = sum(1 for x in rows if x["change_pct"] < -0.05)
-        unchanged = len(rows) - advances - declines
+        advances = sum(1 for x in changed_rows if _self._num(x.get("change_pct")) > 0.05)
+        declines = sum(1 for x in changed_rows if _self._num(x.get("change_pct")) < -0.05)
+        unchanged = len(changed_rows) - advances - declines
         return {
             "success": bool(rows), "count": len(rows), "rows": rows,
             "gainers": gainers, "losers": losers, "volume_leaders": volume_leaders,
