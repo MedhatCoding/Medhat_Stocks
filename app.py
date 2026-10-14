@@ -782,7 +782,24 @@ elif page == "◉  السوق":
                 st.write("المؤشرات التي لم تُجلب:", "، ".join(missing_indices))
             st.caption("اختبار اتصال فعلي بالمزودين، بدون عرض أي مفاتيح سرية:")
             try:
-                provider_checks = data_engine.diagnose_market_data()
+                # Do not depend on a newly-added DataEngine method: Streamlit may
+                # briefly run with an older imported module after a code pull.
+                if hasattr(data_engine, "diagnose_market_data"):
+                    provider_checks = data_engine.diagnose_market_data()
+                else:
+                    provider_checks = {}
+                    if not hasattr(data_engine, "_get") or not hasattr(data_engine, "_oanor_get"):
+                        raise RuntimeError("DataEngine قديم ولا يحتوي دوال الاتصال المطلوبة؛ أعد تشغيل التطبيق من Manage app.")
+                    if getattr(data_engine, "eodhd_api_key", ""):
+                        eod = data_engine._get("eod/COMI.CA", {"period": "d", "order": "d", "from": (datetime.utcnow() - pd.Timedelta(days=14)).strftime("%Y-%m-%d")}, timeout=12)
+                        provider_checks["EODHD"] = {"ok": bool(eod.get("success") and isinstance(eod.get("data"), list)), "message": "الاتصال ناجح." if eod.get("success") else eod.get("error", "فشل غير محدد")}
+                    else:
+                        provider_checks["EODHD"] = {"ok": False, "message": "المفتاح غير موجود."}
+                    if getattr(data_engine, "oanor_api_key", ""):
+                        oa = data_engine._oanor_get("egx-api/v1/index", timeout=12)
+                        provider_checks["OANOR"] = {"ok": bool(oa.get("success")), "message": "الاتصال ناجح." if oa.get("success") else oa.get("error", "فشل غير محدد")}
+                    else:
+                        provider_checks["OANOR"] = {"ok": False, "message": "المفتاح غير موجود."}
                 for provider_name, check in provider_checks.items():
                     status = "نجح" if check.get("ok") else "فشل"
                     st.write(f"{provider_name}: {status} — {check.get('message', 'لا توجد تفاصيل')}")
