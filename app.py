@@ -769,7 +769,19 @@ elif page == "◉  السوق":
             )
 
     else:
-        st.info("لا توجد بيانات مؤشرات متاحة حاليًا. اضغط تحديث السوق لإعادة المحاولة.")
+        st.warning("لا توجد بيانات مؤشرات متاحة حاليًا. المشكلة في جلب البيانات وليست في عرض الجدول.")
+        health = data_engine.health_check()
+        with st.expander("تشخيص اتصال مصادر البيانات", expanded=True):
+            st.write("إعدادات المفاتيح (لا يتم عرض قيمها):")
+            st.write({
+                "EODHD_API_KEY": "موجود" if health.get("eodhd_configured") else "غير موجود",
+                "OANOR_API_KEY": "موجود" if health.get("oanor_configured") else "غير موجود",
+            })
+            missing_indices = indices_board.get("missing", [])
+            if missing_indices:
+                st.write("المؤشرات التي لم تُجلب:", "، ".join(missing_indices))
+            st.caption("لو المفاتيح موجودة وما زالت المؤشرات غير متاحة، فالسبب غالبًا رمز المؤشر أو صلاحية نقطة النهاية لدى المزود. التشخيص هنا لا يكشف أي مفتاح سري.")
+
 
     # Market regime remains based on EGX30, while the table above exposes every
     # supported EGX benchmark including EGX33 Shariah.
