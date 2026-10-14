@@ -460,7 +460,8 @@ class DataEngine:
     def _yahoo_history(self, symbol, period="2y"):
         """Fallback EGX daily history via Yahoo Finance when EODHD is unavailable."""
         code = self.display_symbol(symbol)
-        yahoo_symbol = f"{code}.CA"
+        # Avoid creating invalid tickers such as COMI.CA.CA.
+        yahoo_symbol = code if code.upper().endswith(".CA") else f"{code}.CA"
         try:
             response = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}",
@@ -1400,8 +1401,10 @@ class DataEngine:
         screen = _self._get("screener", {"filters": json.dumps(filters, ensure_ascii=False), "sort": "refund_5d_p.asc", "limit": 100}, timeout=40)
         candidates = (screen.get("data") or {}).get("data", []) if screen.get("success") else []
         if not candidates:
-            # Protect API quotas if Screener is unavailable.
-            candidates = [{"code": s} for s in SHARIA_SYMBOLS[:20]]
+            # If the paid screener is unavailable, scan the complete Sharia universe
+            # through the free historical-data fallback instead of silently limiting
+            # recommendations to the first 20 symbols.
+            candidates = [{"code": s} for s in SHARIA_SYMBOLS]
         # Close older recommendations first so the next ML run can learn from real outcomes.
         try:
             from recommendation_journal import evaluate_open
