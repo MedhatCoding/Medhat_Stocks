@@ -175,6 +175,54 @@ class DataEngine:
             "checked_at": datetime.now(timezone.utc).isoformat(),
         }
 
+    def _yahoo_chart_fallback(self, symbol, period="1y"):
+        """Free Yahoo chart fallback for daily stock history; never fabricate prices."""
+        ticker = str(symbol or "").strip().upper()
+        if not ticker:
+            return {"success": False, "error": "رمز السهم فارغ"}
+        # EODHD Egyptian equities use .CA; Yahoo commonly uses .CA as well.
+        ticker = ticker.replace(".INDX", "").replace(".EGX", ".CA")
+        if "." not in ticker:
+            ticker = f"{ticker}.CA"
+        try:
+            response = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+                params={"range": period, "interval": "1d", "events": "history"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=12,
+            )
+            response.raise_for_status()
+            root = response.json().get("chart", {})
+            if root.get("error"):
+                return {"success": False, "error": "Yahoo Finance لا يوفر بيانات لهذا الرمز."}
+            result = (root.get("result") or [])
+            if not result:
+                return {"success": False, "error": "المصدر المجاني لا يملك تاريخًا لهذا الرمز."}
+            r = result[0]
+            timestamps = r.get("timestamp") or []
+            quote = ((r.get("indicators") or {}).get("quote") or [{}])[0]
+            adj = ((r.get("indicators") or {}).get("adjclose") or [{}])
+            rows = []
+            for i, ts in enumerate(timestamps):
+                close = (quote.get("close") or [None] * len(timestamps))[i]
+                if close is None:
+                    continue
+                rows.append({
+                    "date": datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d"),
+                    "open": (quote.get("open") or [None] * len(timestamps))[i],
+                    "high": (quote.get("high") or [None] * len(timestamps))[i],
+                    "low": (quote.get("low") or [None] * len(timestamps))[i],
+                    "close": close,
+                    "adjusted_close": ((adj[0].get("adjclose") or [None] * len(timestamps))[i]
+                                        if adj and adj[0].get("adjclose") else close),
+                    "volume": (quote.get("volume") or [None] * len(timestamps))[i],
+                })
+            if not rows:
+                return {"success": False, "error": "المصدر المجاني لم يُرجع أسعار إغلاق صالحة."}
+            return {"success": True, "data": rows, "provider": "Yahoo Finance (free)", "delayed": True}
+        except (requests.RequestException, ValueError, KeyError, TypeError, IndexError):
+            return {"success": False, "error": "تعذر جلب البيانات من المصدر المجاني Yahoo Finance."}
+
     def _get(self, path, params=None, timeout=30):
         if not self.eodhd_api_key:
             return {"success": False, "error": "EODHD_API_KEY غير موجود"}
@@ -200,6 +248,13 @@ class DataEngine:
             return {"success": True, "data": payload}
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
+            if path.lstrip("/").startswith("eod/") and status in (402, 401, 403, 404, 429):
+                symbol = path.lstrip("/").split("/", 1)[1]
+                fallback = self._yahoo_chart_fallback(symbol, period="2y")
+                if fallback.get("success"):
+                    fallback["provider_status"] = status
+                    fallback["fallback_reason"] = f"EODHD HTTP {status}"
+                    return fallback
             if status == 404:
                 return {"success": False, "error": "بيانات هذا الرمز أو المسار غير متاحة من EODHD.", "provider_status": status}
             if status in (401, 403):
