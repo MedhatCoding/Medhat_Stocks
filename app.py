@@ -786,8 +786,18 @@ elif page == "◉  السوق":
                 for provider_name, check in provider_checks.items():
                     status = "نجح" if check.get("ok") else "فشل"
                     st.write(f"{provider_name}: {status} — {check.get('message', 'لا توجد تفاصيل')}")
-            except Exception:
-                st.warning("تعذر إكمال اختبار الاتصال. راجع سجلات التطبيق.")
+            except Exception as exc:
+                # Sanitize any accidental credentials and show actionable exception class.
+                detail = str(exc)
+                for secret_name in ("EODHD_API_KEY", "OANOR_API_KEY", "GEMINI_API_KEY"):
+                    try:
+                        secret_value = str(data_engine.__dict__.get(secret_name.lower(), "") or "")
+                        if secret_value:
+                            detail = detail.replace(secret_value, "[REDACTED]")
+                    except Exception:
+                        pass
+                detail = detail.replace("https://", "").replace("http://", "")
+                st.error(f"فشل اختبار التشخيص: {type(exc).__name__}: {detail[:240] or 'لا توجد تفاصيل إضافية'}")
             st.caption("إذا فشل الاختبار، ستوضح الرسالة هل المشكلة صلاحية/اتصال/بيانات الرمز، بدل الاكتفاء بوجود المفتاح.")
 
 
