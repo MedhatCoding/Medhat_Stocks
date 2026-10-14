@@ -988,6 +988,27 @@ class DataEngine:
         }
 
 
+    def diagnose_market_data(_self):
+        """Test provider connectivity without returning or logging credentials."""
+        report = {
+            "EODHD": {"configured": bool(_self.eodhd_api_key), "ok": False, "message": "لم يتم الاختبار"},
+            "OANOR": {"configured": bool(_self.oanor_api_key), "ok": False, "message": "لم يتم الاختبار"},
+        }
+        if _self.eodhd_api_key:
+            # A lightweight historical quote tests both authentication and endpoint access.
+            result = _self._get("eod/COMI.CA", {"period": "d", "order": "d", "from": (datetime.now(timezone.utc) - timedelta(days=14)).strftime("%Y-%m-%d")}, timeout=12)
+            report["EODHD"]["ok"] = bool(result.get("success") and isinstance(result.get("data"), list))
+            report["EODHD"]["message"] = "الاتصال ناجح والرمز التجريبي أعاد بيانات." if report["EODHD"]["ok"] else str(result.get("error") or "المزود لم يُرجع بيانات بالصيغة المتوقعة.")
+        else:
+            report["EODHD"]["message"] = "المفتاح غير موجود في بيئة تشغيل التطبيق."
+        if _self.oanor_api_key:
+            result = _self._oanor_get("egx-api/v1/index", timeout=12)
+            report["OANOR"]["ok"] = bool(result.get("success"))
+            report["OANOR"]["message"] = "الاتصال ناجح." if report["OANOR"]["ok"] else str(result.get("error") or "المزود لم يُرجع استجابة ناجحة.")
+        else:
+            report["OANOR"]["message"] = "المفتاح غير موجود في بيئة تشغيل التطبيق."
+        return report
+
     @st.cache_data(ttl=600, show_spinner=False)
     def get_market_indices(_self):
         """Return the main EGX indices, with EGX33/Shariah treated as first-class."""
