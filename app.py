@@ -780,7 +780,15 @@ elif page == "◉  السوق":
             missing_indices = indices_board.get("missing", [])
             if missing_indices:
                 st.write("المؤشرات التي لم تُجلب:", "، ".join(missing_indices))
-            st.caption("لو المفاتيح موجودة وما زالت المؤشرات غير متاحة، فالسبب غالبًا رمز المؤشر أو صلاحية نقطة النهاية لدى المزود. التشخيص هنا لا يكشف أي مفتاح سري.")
+            st.caption("اختبار اتصال فعلي بالمزودين، بدون عرض أي مفاتيح سرية:")
+            try:
+                provider_checks = data_engine.diagnose_market_data()
+                for provider_name, check in provider_checks.items():
+                    status = "نجح" if check.get("ok") else "فشل"
+                    st.write(f"{provider_name}: {status} — {check.get('message', 'لا توجد تفاصيل')}")
+            except Exception:
+                st.warning("تعذر إكمال اختبار الاتصال. راجع سجلات التطبيق.")
+            st.caption("إذا فشل الاختبار، ستوضح الرسالة هل المشكلة صلاحية/اتصال/بيانات الرمز، بدل الاكتفاء بوجود المفتاح.")
 
 
     # Market regime remains based on EGX30, while the table above exposes every
