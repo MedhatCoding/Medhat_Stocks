@@ -41,7 +41,7 @@ class DataEngine:
     """EGX data + technical analysis engine."""
 
     BASE_URL = "https://eodhd.com/api"
-    EGX_EXCHANGE = "EGX"
+    EGX_EXCHANGE = "CA"
 
     def __init__(self):
         self.eodhd_api_key = get_secret("EODHD_API_KEY")
@@ -160,7 +160,7 @@ class DataEngine:
         if not value:
             return ""
         if "." not in value:
-            value = f"{value}.EGX"
+            value = f"{value}.CA"
         return value
 
     @staticmethod
