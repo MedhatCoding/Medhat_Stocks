@@ -531,8 +531,19 @@ class DataEngine:
         if not result["success"]:
             fallback = _self._yahoo_history(normalized)
             if fallback.get("success"):
+                fallback["primary_provider_error"] = result.get("error", "EODHD failed")
                 return fallback
-            return {"success": False, "symbol": normalized, "error": result["error"], "data": []}
+            # Preserve both provider failures so the app can explain why a
+            # symbol has no usable history instead of reporting a vague blank.
+            primary_error = str(result.get("error") or "EODHD لم يُرجع بيانات")
+            fallback_error = str(fallback.get("error") or "Yahoo Finance لم يُرجع بيانات تاريخية")
+            return {
+                "success": False,
+                "symbol": normalized,
+                "error": f"EODHD: {primary_error} | Yahoo Finance: {fallback_error}",
+                "provider_status": result.get("provider_status"),
+                "data": [],
+            }
         data = result["data"]
         if not isinstance(data, list):
             return {"success": False, "symbol": normalized, "error": "لا توجد بيانات تاريخية", "data": []}
@@ -1493,6 +1504,14 @@ class DataEngine:
                 continue
             if not analysis or not analysis.get("success"):
                 diagnostics["no_history"] += 1
+                # analyze_stock returns a failure object for missing/short
+                # history; surface the actual provider reason in diagnostics.
+                if len(diagnostics["error_samples"]) < 5:
+                    diagnostics["error_samples"].append({
+                        "symbol": symbol,
+                        "stage": "history",
+                        "error": str((analysis or {}).get("error") or "لا توجد بيانات تاريخية كافية")[:240],
+                    })
                 continue
             analyzed_count += 1
             diagnostics["analyzed"] = analyzed_count
