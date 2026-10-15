@@ -1285,9 +1285,16 @@ class DataEngine:
                     })
 
         if not rows:
-            # Bound the historical fallback to a small rotating-free-source
-            # sample; don't hammer Yahoo/EODHD when the quote provider is unavailable.
-            for symbol in symbols[:12]:
+            # Bound the historical fallback to a rotating sample of 12 symbols
+            # per 15-minute window; avoid repeatedly requesting only the first names.
+            batch_size = 12
+            batch_count = max(1, (len(symbols) + batch_size - 1) // batch_size)
+            slot = int(datetime.now(timezone.utc).timestamp() // 900) % batch_count
+            start = slot * batch_size
+            fallback_symbols = symbols[start:start + batch_size]
+            if len(fallback_symbols) < batch_size and start > 0:
+                fallback_symbols += symbols[:batch_size - len(fallback_symbols)]
+            for symbol in fallback_symbols:
                 try:
                     hist = _self.get_stock_history(symbol, days=35)
                     data = hist.get("data", []) if hist.get("success") else []
