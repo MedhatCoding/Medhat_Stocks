@@ -652,8 +652,12 @@ if page == "⌂  الرئيسية":
                 f'استبعاد فني لـ {diag.get("technical_blocks", 0)}، '
                 f'درجة منخفضة لـ {diag.get("low_score", 0)}، '
                 f'إشارة ارتداد غير كافية لـ {diag.get("low_rebound", 0)}، '
-                f'مخاطر مرتفعة لـ {diag.get("high_risk", 0)}.'
+                f'مخاطر مرتفعة لـ {diag.get("high_risk", 0)}؛ '
+                f'أخطاء تحليل {diag.get("analysis_errors", 0)}، وأخطاء حساب الدرجات {diag.get("scoring_errors", 0)}.'
             )
+            if diag.get("error_samples"):
+                with st.expander("تفاصيل أخطاء التحليل المسجلة"):
+                    st.dataframe(pd.DataFrame(diag["error_samples"]), use_container_width=True, hide_index=True)
             watch = premarket.get("near_misses") or []
             if watch:
                 st.markdown('<div class="section">مرشحو المراقبة — ليست توصيات شراء</div>', unsafe_allow_html=True)
@@ -944,11 +948,18 @@ elif page == "✦  الفرص":
             ("ارتداد غير كافٍ", diagnostics.get("low_rebound", 0)),
             ("مخاطر مرتفعة/غير متاحة", diagnostics.get("high_risk", 0)),
             ("لم تجتز الشروط النهائية", diagnostics.get("final_gate", 0)),
+            ("أخطاء التحليل", diagnostics.get("analysis_errors", 0)),
+            ("أخطاء حساب الدرجات", diagnostics.get("scoring_errors", 0)),
         ]
-        reason_cols = st.columns(len(reasons))
-        for col, (label, value) in zip(reason_cols, reasons):
-            with col:
+        reason_cols = st.columns(4)
+        for index, (label, value) in enumerate(reasons):
+            with reason_cols[index % 4]:
                 st.metric(label, value)
+
+        error_samples = diagnostics.get("error_samples") or []
+        if error_samples:
+            with st.expander("تفاصيل أخطاء التحليل المسجلة"):
+                st.dataframe(pd.DataFrame(error_samples), use_container_width=True, hide_index=True)
 
         near_misses = opportunities.get("near_misses") or []
         st.markdown('<div class="section">أفضل الأسهم للمراقبة — ليست توصيات شراء</div>', unsafe_allow_html=True)
