@@ -1206,7 +1206,7 @@ class DataEngine:
             "missing": [x["name"] for x in specs if x["name"] not in {i["name"] for i in indices}],
         }
 
-    @st.cache_data(ttl=300, show_spinner=False)
+    @st.cache_data(ttl=900, show_spinner=False)
     def get_market_snapshot(_self, limit=96):
         """Build the Sharia EGX market board from OANOR live quotes in batches."""
         symbols = list(dict.fromkeys(SHARIA_SYMBOLS))[:max(1, int(limit))]
@@ -1285,9 +1285,9 @@ class DataEngine:
                     })
 
         if not rows:
-            # Bound the historical fallback to protect the EODHD request quota
-            # when OANOR quotes are unavailable; the UI labels the sample size.
-            for symbol in symbols[:24]:
+            # Bound the historical fallback to a small rotating-free-source
+            # sample; don't hammer Yahoo/EODHD when the quote provider is unavailable.
+            for symbol in symbols[:12]:
                 try:
                     hist = _self.get_stock_history(symbol, days=35)
                     data = hist.get("data", []) if hist.get("success") else []
