@@ -7,6 +7,8 @@ from datetime import datetime
 import pandas as pd
 import requests
 import streamlit as st
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from data_engine import data_engine
 from sharia_universe import SHARIA_SYMBOLS, REFERENCE_DATE, REFERENCE_SOURCE, is_sharia_reference
@@ -1364,12 +1366,94 @@ elif page == "⌕  تحليل":
                         st.info("شرح Gemini غير مفعّل؛ أضف GEMINI_API_KEY في إعدادات النشر.")
 
                 if technical_visible:
-                    st.markdown('<div class="section">الشارت</div>', unsafe_allow_html=True)
-                    chart = result["chart"].copy()
-                    chart["date"] = pd.to_datetime(chart["date"])
-                    chart = chart.set_index("date")
-                    chart.columns = ["الإغلاق", "SMA 20", "SMA 50", "SMA 200"]
-                    st.line_chart(chart, height=390)
+                    st.markdown('<div class="section">📈 الرسم الفني التفاعلي</div>', unsafe_allow_html=True)
+                    chart = pd.DataFrame(result.get("chart") or []).copy()
+                    if not chart.empty and "date" in chart and "close" in chart:
+                        chart["date"] = pd.to_datetime(chart["date"], errors="coerce")
+                        for col in ["open", "high", "low", "close", "volume", "sma20", "sma50", "sma200"]:
+                            if col in chart.columns:
+                                chart[col] = pd.to_numeric(chart[col], errors="coerce")
+                        chart = chart.dropna(subset=["date", "close"]).sort_values("date")
+                        period_cols = st.columns([1, 2])
+                        with period_cols[0]:
+                            chart_period = st.selectbox(
+                                "الفترة الزمنية",
+                                ["شهر", "3 شهور", "6 شهور", "سنة"],
+                                index=3,
+                                key=f"chart_period_{symbol}",
+                            )
+                        with period_cols[1]:
+                            st.caption("شموع سعرية • متوسطات متحركة • حجم التداول — بيانات تاريخية متاحة وليست بثًا لحظيًا")
+                        period_days = {"شهر": 22, "3 شهور": 66, "6 شهور": 130, "سنة": 260}
+                        chart = chart.tail(period_days[chart_period]).copy()
+                        has_ohlc = all(c in chart.columns for c in ["open", "high", "low", "close"]) and chart[["open", "high", "low"]].notna().all(axis=1).any()
+                        has_volume = "volume" in chart.columns and chart["volume"].notna().any()
+                        if has_volume:
+                            fig = make_subplots(
+                                rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.035,
+                                row_heights=[0.76, 0.24], specs=[[{"secondary_y": False}], [{"secondary_y": False}]],
+                            )
+                        else:
+                            fig = go.Figure()
+                        if has_ohlc:
+                            candle = go.Candlestick(
+                                x=chart["date"], open=chart["open"], high=chart["high"],
+                                low=chart["low"], close=chart["close"], name="السعر",
+                                increasing_line_color="#22d47a", decreasing_line_color="#ff6677",
+                                increasing_fillcolor="#22d47a", decreasing_fillcolor="#ff6677",
+                            )
+                            fig.add_trace(candle, row=1, col=1) if has_volume else fig.add_trace(candle)
+                        else:
+                            line = go.Scatter(
+                                x=chart["date"], y=chart["close"], mode="lines",
+                                name="الإغلاق", line={"color": "#22d47a", "width": 2.4},
+                                fill="tozeroy", fillcolor="rgba(34,212,122,0.08)",
+                            )
+                            fig.add_trace(line, row=1, col=1) if has_volume else fig.add_trace(line)
+                        for col, label, color in [
+                            ("sma20", "متوسط 20", "#f4c95d"),
+                            ("sma50", "متوسط 50", "#6aa9ff"),
+                            ("sma200", "متوسط 200", "#c49aff"),
+                        ]:
+                            if col in chart.columns and chart[col].notna().any():
+                                trace = go.Scatter(
+                                    x=chart["date"], y=chart[col], mode="lines", name=label,
+                                    line={"color": color, "width": 1.35},
+                                )
+                                fig.add_trace(trace, row=1, col=1) if has_volume else fig.add_trace(trace)
+                        if has_volume:
+                            volume_colors = [
+                                "#22d47a" if pd.notna(o) and pd.notna(c) and c >= o else "#ff6677"
+                                for o, c in zip(chart.get("open", chart["close"]), chart["close"])
+                            ]
+                            fig.add_trace(
+                                go.Bar(
+                                    x=chart["date"], y=chart["volume"], name="حجم التداول",
+                                    marker_color=volume_colors, opacity=0.72,
+                                    hovertemplate="%{x|%d-%m-%Y}<br>الحجم: %{y:,.0f}<extra></extra>",
+                                ),
+                                row=2, col=1,
+                            )
+                            fig.update_yaxes(title_text="السعر", row=1, col=1, showgrid=True, gridcolor="#20344d")
+                            fig.update_yaxes(title_text="الحجم", row=2, col=1, showgrid=True, gridcolor="#20344d")
+                        fig.update_layout(
+                            template="plotly_dark", height=540 if has_volume else 440,
+                            paper_bgcolor="#0d1b2c", plot_bgcolor="#0d1b2c",
+                            font={"family": "Cairo, sans-serif", "color": "#dbe7f3", "size": 12},
+                            margin={"l": 12, "r": 12, "t": 35, "b": 10},
+                            legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
+                            hovermode="x unified", xaxis_rangeslider_visible=False,
+                            dragmode="pan",
+                        )
+                        fig.update_xaxes(showgrid=True, gridcolor="#20344d", zeroline=False)
+                        fig.update_yaxes(zeroline=False)
+                        st.plotly_chart(fig, use_container_width=True, config={
+                            "displaylogo": False, "scrollZoom": True, "responsive": True,
+                            "modeBarButtonsToRemove": ["select2d", "lasso2d"],
+                        })
+                        st.caption("استخدم السحب للتنقل والتكبير، أو أدوات الرسم أعلى المخطط. إذا لم يوفر المصدر أسعار الافتتاح/الأعلى/الأدنى، يعرض التطبيق خط الإغلاق بدل شموع غير مكتملة.")
+                    else:
+                        st.info("لا توجد سلسلة سعرية كافية للرسم حاليًا؛ لن يتم إنشاء بيانات افتراضية.")
 
                 if technical_visible:
                     st.markdown('<div class="section">التفاصيل الفنية</div>', unsafe_allow_html=True)
