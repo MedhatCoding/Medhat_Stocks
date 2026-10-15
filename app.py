@@ -662,10 +662,11 @@ if page == "⌂  الرئيسية":
                     "درجة الفرصة": row.get("opportunity_score"),
                     "درجة الارتداد": row.get("rebound_score"),
                     "المخاطر": row.get("risk_score"),
+                    "سبب عدم التأهل": row.get("reason"),
                     "التاريخ": row.get("date"),
                 } for row in watch])
                 st.dataframe(watch_df, use_container_width=True, hide_index=True)
-                st.caption("هذه أسهم قريبة من بعض شروط الفحص فقط؛ لا تُعد إشارة دخول، ويجب مراجعة تحليل كل سهم قبل أي قرار.")
+                st.caption("الجدول يعرض أعلى 10 أسهم أمكن تحليلها مع سبب عدم التأهل لكل سهم؛ هو قائمة تشخيص ومراقبة فقط وليس توصية شراء.")
     else:
         st.error(friendly_error(premarket.get("error", "تعذر تجهيز تقرير ما قبل الافتتاح.")))
 
