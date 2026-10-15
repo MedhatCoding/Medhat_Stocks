@@ -1455,24 +1455,34 @@ class DataEngine:
             except (TypeError, ValueError, KeyError):
                 continue
             risk_value = _self._num(analysis.get("risk_score"))
+            # Always populate a transparent ranked monitoring list from successfully
+            # analyzed stocks. This list is NOT a buy list and includes explicit
+            # rejection reasons; the qualification gates below remain unchanged.
+            if preliminary["hard_blocks"]:
+                watch_reason = "استبعاد فني: " + "، ".join(preliminary["hard_blocks"])
+            elif risk_value is None:
+                watch_reason = "درجة المخاطر غير متاحة"
+            elif risk_value > 65:
+                watch_reason = "المخاطر أعلى من الحد المسموح"
+            elif preliminary["rebound_score"] < 45:
+                watch_reason = "إشارة الارتداد أقل من شرط التأهل"
+            elif preliminary["final_opportunity_score"] < 41:
+                watch_reason = "درجة الفرصة الأولية أقل من الحد"
+            else:
+                watch_reason = "مرشح للمراقبة؛ لم يجتز جميع شروط التأهل النهائية"
+            near_misses.append({
+                "symbol": symbol,
+                "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
+                "date": analysis.get("date"),
+                "close": analysis.get("close"),
+                "opportunity_score": preliminary["final_opportunity_score"],
+                "rebound_score": preliminary["rebound_score"],
+                "risk_score": analysis.get("risk_score"),
+                "reason": watch_reason,
+            })
             if preliminary["hard_blocks"]:
                 diagnostics["technical_blocks"] += 1
                 continue
-            # Keep near-misses visible as a separate monitoring list, never as
-            # buy recommendations. This makes a zero-qualified result explainable.
-            if (preliminary["final_opportunity_score"] >= 35
-                    and preliminary["rebound_score"] >= 30
-                    and risk_value is not None and risk_value <= 65):
-                near_misses.append({
-                    "symbol": symbol,
-                    "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
-                    "date": analysis.get("date"),
-                    "close": analysis.get("close"),
-                    "opportunity_score": preliminary["final_opportunity_score"],
-                    "rebound_score": preliminary["rebound_score"],
-                    "risk_score": analysis.get("risk_score"),
-                    "reason": "مرشح للمراقبة فقط؛ لم يجتز جميع شروط الفرصة المؤهلة.",
-                })
             if preliminary["final_opportunity_score"] < 41:
                 diagnostics["low_score"] += 1
                 continue
@@ -1525,6 +1535,7 @@ class DataEngine:
                 "name_en": item.get("name") or symbol, "date": analysis.get("date"), "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "seasonality_score": setup.get("seasonality_score"), "defensive_bias": setup.get("defensive_bias")})
         rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
         near_misses.sort(key=lambda x: (x["opportunity_score"], x["rebound_score"]), reverse=True)
+        near_misses = near_misses[:10]
         diagnostics["near_misses"] = len(near_misses)
         if analyzed_count == 0:
             return {
