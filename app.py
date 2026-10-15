@@ -643,6 +643,29 @@ if page == "⌂  الرئيسية":
                     st.rerun()
         else:
             st.info("لا توجد حالياً فرصة تستوفي شروط الفحص؛ التطبيق لا يعرض فرصة مصطنعة.")
+            diag = premarket.get("diagnostics") or {}
+            st.caption(
+                f'نتيجة الفحص: تم تحليل {diag.get("analyzed", 0)} من أصل {diag.get("universe", 96)} سهمًا؛ '
+                f'بيانات غير كافية لـ {diag.get("no_history", 0)} سهم، '
+                f'استبعاد فني لـ {diag.get("technical_blocks", 0)}، '
+                f'درجة منخفضة لـ {diag.get("low_score", 0)}، '
+                f'إشارة ارتداد غير كافية لـ {diag.get("low_rebound", 0)}، '
+                f'مخاطر مرتفعة لـ {diag.get("high_risk", 0)}.'
+            )
+            watch = premarket.get("near_misses") or []
+            if watch:
+                st.markdown('<div class="section">مرشحو المراقبة — ليست توصيات شراء</div>', unsafe_allow_html=True)
+                watch_df = pd.DataFrame([{
+                    "السهم": row.get("symbol"),
+                    "الشركة": row.get("name"),
+                    "آخر إغلاق": row.get("close"),
+                    "درجة الفرصة": row.get("opportunity_score"),
+                    "درجة الارتداد": row.get("rebound_score"),
+                    "المخاطر": row.get("risk_score"),
+                    "التاريخ": row.get("date"),
+                } for row in watch])
+                st.dataframe(watch_df, use_container_width=True, hide_index=True)
+                st.caption("هذه أسهم قريبة من بعض شروط الفحص فقط؛ لا تُعد إشارة دخول، ويجب مراجعة تحليل كل سهم قبل أي قرار.")
     else:
         st.error(friendly_error(premarket.get("error", "تعذر تجهيز تقرير ما قبل الافتتاح.")))
 
