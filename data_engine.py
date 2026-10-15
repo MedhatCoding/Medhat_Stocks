@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
@@ -48,6 +49,9 @@ class DataEngine:
         self.oanor_api_key = get_secret("OANOR_API_KEY")
         self.gemini_api_key = get_secret("GEMINI_API_KEY")
         self.gemini_model = get_secret("GEMINI_MODEL") or "gemini-2.5-flash"
+        # Circuit breaker: after a plan/payment rejection, avoid repeatedly
+        # hitting a provider that has already refused access.
+        self.eodhd_blocked_until = 0.0
 
     ARABIC_COMPANY_NAMES = {
         "AALR":"العربية للأدوية والصناعات الكيماوية",
@@ -226,6 +230,21 @@ class DataEngine:
     def _get(self, path, params=None, timeout=30):
         if not self.eodhd_api_key:
             return {"success": False, "error": "EODHD_API_KEY غير موجود"}
+        # Respect free-plan limits: after HTTP 402/401/403/429, don't keep
+        # spending requests on a provider endpoint that is refusing access.
+        if time.time() < getattr(self, "eodhd_blocked_until", 0.0):
+            if path.lstrip("/").startswith("eod/"):
+                symbol = path.lstrip("/").split("/", 1)[1]
+                fallback = self._yahoo_chart_fallback(symbol, period="2y")
+                if fallback.get("success"):
+                    fallback["provider_status"] = "circuit_open"
+                    fallback["fallback_reason"] = "EODHD temporarily skipped after access rejection"
+                    return fallback
+            return {
+                "success": False,
+                "error": "تم إيقاف طلبات EODHD مؤقتًا بعد رفض صلاحية/حدود الخطة؛ نستخدم المصدر المجاني البديل عند توفره.",
+                "provider_status": "circuit_open",
+            }
         query = dict(params or {})
         query["api_token"] = self.eodhd_api_key
         query.setdefault("fmt", "json")
@@ -248,6 +267,8 @@ class DataEngine:
             return {"success": True, "data": payload}
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
+            if status in (402, 401, 403, 429):
+                self.eodhd_blocked_until = time.time() + 3600
             if path.lstrip("/").startswith("eod/") and status in (402, 401, 403, 404, 429):
                 symbol = path.lstrip("/").split("/", 1)[1]
                 fallback = self._yahoo_chart_fallback(symbol, period="2y")
@@ -1156,6 +1177,10 @@ class DataEngine:
                         if item:
                             item["provider"] = "EODHD"
                             break
+                    # Stop trying aliases when the provider has rejected the plan
+                    # or the circuit breaker is open; another alias won't fix access.
+                    if history.get("provider_status") in (402, 401, 403, 429, "circuit_open"):
+                        break
 
             # Yahoo is a last-resort historical source for verified index tickers.
             if item is None:
@@ -1401,10 +1426,26 @@ class DataEngine:
         screen = _self._get("screener", {"filters": json.dumps(filters, ensure_ascii=False), "sort": "refund_5d_p.asc", "limit": 100}, timeout=40)
         candidates = (screen.get("data") or {}).get("data", []) if screen.get("success") else []
         if not candidates:
-            # If the paid screener is unavailable, scan the complete Sharia universe
-            # through the free historical-data fallback instead of silently limiting
-            # recommendations to the first 20 symbols.
             candidates = [{"code": s} for s in SHARIA_SYMBOLS]
+
+        # Conservative free-source request budget: analyze only 12 names per
+        # 15-minute scan and rotate through the full universe over time. History
+        # is cached separately, so the app won't repeatedly request the same names.
+        scan_batch_size = 12
+        universe_codes = list(dict.fromkeys(
+            _self.display_symbol(item.get("code") or "")
+            for item in candidates
+            if _self.display_symbol(item.get("code") or "") in SHARIA_SYMBOLS
+        ))
+        if not universe_codes:
+            universe_codes = list(SHARIA_SYMBOLS)
+        batch_count = max(1, (len(universe_codes) + scan_batch_size - 1) // scan_batch_size)
+        time_slot = int(datetime.now(timezone.utc).timestamp() // 900) % batch_count
+        batch_start = time_slot * scan_batch_size
+        selected_codes = universe_codes[batch_start:batch_start + scan_batch_size]
+        if len(selected_codes) < scan_batch_size and batch_start > 0:
+            selected_codes += universe_codes[:scan_batch_size - len(selected_codes)]
+        candidates = [{"code": code} for code in selected_codes]
         # Close older recommendations first so the next ML run can learn from real outcomes.
         try:
             from recommendation_journal import evaluate_open
@@ -1428,9 +1469,8 @@ class DataEngine:
             "high_risk": 0,
             "final_gate": 0,
         }
-        # The screener is requested for up to 100 symbols, enough to cover
-        # the full Sharia reference universe; analyze all returned matches.
-        for item in candidates[:len(SHARIA_SYMBOLS)]:
+        # Analyze only the selected low-request batch in this run.
+        for item in candidates[:scan_batch_size]:
             symbol = _self.display_symbol(item.get("code") or "")
             if symbol not in SHARIA_SYMBOLS:
                 continue
