@@ -1452,7 +1452,56 @@ elif page == "⌕  تحليل":
                             "displaylogo": False, "scrollZoom": True, "responsive": True,
                             "modeBarButtonsToRemove": ["select2d", "lasso2d"],
                         })
-                        st.caption("استخدم السحب للتنقل والتكبير، أو أدوات الرسم أعلى المخطط. إذا لم يوفر المصدر أسعار الافتتاح/الأعلى/الأدنى، يعرض التطبيق خط الإغلاق بدل شموع غير مكتملة.")
+
+                        # Compact technical indicator panels, using the same cached history.
+                        ind_left, ind_right = st.columns(2)
+                        if "rsi14" in chart.columns and chart["rsi14"].notna().any():
+                            rsi_fig = go.Figure()
+                            rsi_fig.add_trace(go.Scatter(
+                                x=chart["date"], y=chart["rsi14"], name="RSI 14",
+                                mode="lines", line={"color": "#6aa9ff", "width": 2},
+                            ))
+                            rsi_fig.add_hline(y=70, line_dash="dash", line_color="#ff6677", opacity=0.7)
+                            rsi_fig.add_hline(y=30, line_dash="dash", line_color="#22d47a", opacity=0.7)
+                            rsi_fig.update_layout(
+                                template="plotly_dark", title="RSI — الزخم", height=250,
+                                paper_bgcolor="#0d1b2c", plot_bgcolor="#0d1b2c",
+                                font={"family": "Cairo, sans-serif", "color": "#dbe7f3", "size": 11},
+                                margin={"l": 8, "r": 8, "t": 42, "b": 8},
+                                showlegend=False, yaxis={"range": [0, 100], "gridcolor": "#20344d"},
+                            )
+                            rsi_fig.update_xaxes(showgrid=True, gridcolor="#20344d")
+                            with ind_left:
+                                st.plotly_chart(rsi_fig, use_container_width=True, config={"displaylogo": False, "responsive": True})
+
+                        if all(col in chart.columns for col in ["macd", "macd_signal", "macd_hist"]) and chart["macd"].notna().any():
+                            macd_fig = go.Figure()
+                            macd_fig.add_trace(go.Bar(
+                                x=chart["date"], y=chart["macd_hist"], name="Histogram",
+                                marker_color=["#22d47a" if v >= 0 else "#ff6677" for v in chart["macd_hist"].fillna(0)],
+                                opacity=0.65,
+                            ))
+                            macd_fig.add_trace(go.Scatter(
+                                x=chart["date"], y=chart["macd"], name="MACD",
+                                mode="lines", line={"color": "#6aa9ff", "width": 1.8},
+                            ))
+                            macd_fig.add_trace(go.Scatter(
+                                x=chart["date"], y=chart["macd_signal"], name="Signal",
+                                mode="lines", line={"color": "#f4c95d", "width": 1.5},
+                            ))
+                            macd_fig.update_layout(
+                                template="plotly_dark", title="MACD — الاتجاه والزخم", height=250,
+                                paper_bgcolor="#0d1b2c", plot_bgcolor="#0d1b2c",
+                                font={"family": "Cairo, sans-serif", "color": "#dbe7f3", "size": 11},
+                                margin={"l": 8, "r": 8, "t": 42, "b": 8},
+                                legend={"orientation": "h", "y": 1.12, "x": 1, "xanchor": "right"},
+                            )
+                            macd_fig.update_xaxes(showgrid=True, gridcolor="#20344d")
+                            macd_fig.update_yaxes(showgrid=True, gridcolor="#20344d", zeroline=True, zerolinecolor="#60758b")
+                            with ind_right:
+                                st.plotly_chart(macd_fig, use_container_width=True, config={"displaylogo": False, "responsive": True})
+
+                        st.caption("استخدم السحب للتنقل والتكبير. السعر والحجم وRSI وMACD محسوبة من التاريخ المتاح؛ قد تكون البيانات متأخرة وليست بثًا لحظيًا.")
                     else:
                         st.info("لا توجد سلسلة سعرية كافية للرسم حاليًا؛ لن يتم إنشاء بيانات افتراضية.")
 
