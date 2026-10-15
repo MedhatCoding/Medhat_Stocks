@@ -766,7 +766,7 @@ class DataEngine:
             "status": status, "history_rows": len(frame),
             "entry_low": entry_low, "entry_high": entry_high, "target1": target1,
             "target2": target2, "stop": stop,
-            "chart": frame.tail(120)[["date","close","sma20","sma50","sma200"]].assign(
+            "chart": frame.tail(260)[[c for c in ["date","open","high","low","close","volume","sma20","sma50","sma200"] if c in frame.columns]].assign(
                 date=lambda x: x["date"].dt.strftime("%Y-%m-%d")),
             "ml": ml,
         }
