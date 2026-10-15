@@ -924,7 +924,51 @@ elif page == "✦  الفرص":
     if not opportunities.get("success"):
         st.error(opportunities.get("error", "تعذر تشغيل فحص الفرص."))
     elif not opportunities.get("data"):
-        st.info("لا توجد حالياً فرصة تستوفي شروط الفحص. هذا أفضل من عرض سهم بلا إشارة كافية.")
+        st.info("لا توجد فرصة اجتازت شروط التوصية في العينة الحالية. ده لا يعني أن كل الأسهم الـ96 اتفحصت في نفس اللحظة؛ الفحص موزع على دفعات لتقليل استهلاك الـAPI المجانية.")
+
+        diagnostics = opportunities.get("diagnostics") or {}
+        st.markdown('<div class="section">حالة الفحص</div>', unsafe_allow_html=True)
+        d1, d2, d3, d4 = st.columns(4)
+        with d1:
+            st.metric("أسهم بالقائمة", diagnostics.get("universe", opportunities.get("sharia_universe_count", "—")))
+        with d2:
+            st.metric("أسهم في الدفعة", diagnostics.get("candidates", "—"))
+        with d3:
+            st.metric("تم تحليلها", diagnostics.get("analyzed", opportunities.get("analyzed_count", "—")))
+        with d4:
+            st.metric("بيانات غير متاحة", diagnostics.get("no_history", "—"))
+
+        reasons = [
+            ("استبعاد فني", diagnostics.get("technical_blocks", 0)),
+            ("درجة فرصة منخفضة", diagnostics.get("low_score", 0)),
+            ("ارتداد غير كافٍ", diagnostics.get("low_rebound", 0)),
+            ("مخاطر مرتفعة/غير متاحة", diagnostics.get("high_risk", 0)),
+            ("لم تجتز الشروط النهائية", diagnostics.get("final_gate", 0)),
+        ]
+        reason_cols = st.columns(len(reasons))
+        for col, (label, value) in zip(reason_cols, reasons):
+            with col:
+                st.metric(label, value)
+
+        near_misses = opportunities.get("near_misses") or []
+        st.markdown('<div class="section">أفضل الأسهم للمراقبة — ليست توصيات شراء</div>', unsafe_allow_html=True)
+        if near_misses:
+            watch = pd.DataFrame(near_misses)
+            watch = watch.rename(columns={
+                "name": "الشركة", "symbol": "الرمز", "date": "تاريخ البيانات",
+                "close": "آخر سعر متاح", "opportunity_score": "درجة الفرصة",
+                "rebound_score": "درجة الارتداد", "risk_score": "المخاطر",
+                "reason": "سبب عدم التأهل",
+            })
+            if "آخر سعر متاح" in watch:
+                watch["آخر سعر متاح"] = watch["آخر سعر متاح"].map(money)
+            visible = [col for col in ["الشركة", "الرمز", "تاريخ البيانات", "آخر سعر متاح", "درجة الفرصة", "درجة الارتداد", "المخاطر", "سبب عدم التأهل"] if col in watch.columns]
+            st.dataframe(watch[visible], use_container_width=True, hide_index=True)
+            st.caption("القائمة تعرض الأسهم التي أمكن تحليلها في الدفعة الحالية فقط. السعر قد يكون تاريخيًا بحسب المصدر؛ لا تُعتبر هذه القائمة إشارة شراء.")
+        elif diagnostics.get("analyzed", 0) == 0:
+            st.warning("لم يرجع مصدر البيانات تاريخًا صالحًا لأي سهم في الدفعة الحالية؛ لذلك لا توجد قائمة مراقبة موثوقة لعرضها.")
+        else:
+            st.caption("تم تحليل الأسهم، لكن لا توجد بيانات كافية لتكوين قائمة مراقبة في هذه الدفعة.")
     else:
         market = opportunities.get("market", {})
         if market.get("success"):
