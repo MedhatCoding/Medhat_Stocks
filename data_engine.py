@@ -1428,24 +1428,16 @@ class DataEngine:
 
     @st.cache_data(ttl=900, show_spinner=False)
     def get_opportunities(_self, limit=20):
-        import json
-        filters = [["exchange", "=", _self.EGX_EXCHANGE], ["code", "in", SHARIA_SYMBOLS], ["refund_5d_p", "<", 0]]
-        screen = _self._get("screener", {"filters": json.dumps(filters, ensure_ascii=False), "sort": "refund_5d_p.asc", "limit": 100}, timeout=40)
-        candidates = (screen.get("data") or {}).get("data", []) if screen.get("success") else []
-        if not candidates:
-            candidates = [{"code": s} for s in SHARIA_SYMBOLS]
-
-        # Conservative free-source request budget: analyze only 12 names per
-        # 15-minute scan and rotate through the full universe over time. History
-        # is cached separately, so the app won't repeatedly request the same names.
+        # Scan the configured Sharia universe itself, not only symbols returned
+        # by the provider's short-term-decline screener. A screener subset can
+        # hide valid setups among the remaining approved symbols.
+        # Keep the request budget conservative: rotate 12 symbols every 15 minutes.
         scan_batch_size = 12
         universe_codes = list(dict.fromkeys(
-            _self.display_symbol(item.get("code") or "")
-            for item in candidates
-            if _self.display_symbol(item.get("code") or "") in SHARIA_SYMBOLS
+            _self.display_symbol(symbol)
+            for symbol in SHARIA_SYMBOLS
+            if _self.display_symbol(symbol) in SHARIA_SYMBOLS
         ))
-        if not universe_codes:
-            universe_codes = list(SHARIA_SYMBOLS)
         batch_count = max(1, (len(universe_codes) + scan_batch_size - 1) // scan_batch_size)
         time_slot = int(datetime.now(timezone.utc).timestamp() // 900) % batch_count
         batch_start = time_slot * scan_batch_size
@@ -1475,6 +1467,9 @@ class DataEngine:
             "low_rebound": 0,
             "high_risk": 0,
             "final_gate": 0,
+            "analysis_errors": 0,
+            "scoring_errors": 0,
+            "error_samples": [],
         }
         # Analyze only the selected low-request batch in this run.
         for item in candidates[:scan_batch_size]:
@@ -1485,8 +1480,16 @@ class DataEngine:
             # analysis loads fundamentals on demand to conserve EODHD API calls.
             try:
                 analysis = _self.analyze_stock(symbol, include_fundamentals=False, include_ml=False)
-            except Exception:
-                # A malformed quote/history for one company must not stop the full scan.
+            except Exception as exc:
+                # A malformed quote/history for one company must not stop the full scan,
+                # but keep a short diagnostic so data failures aren't silently hidden.
+                diagnostics["analysis_errors"] += 1
+                if len(diagnostics["error_samples"]) < 5:
+                    diagnostics["error_samples"].append({
+                        "symbol": symbol,
+                        "stage": "analysis",
+                        "error": str(exc)[:240],
+                    })
                 continue
             if not analysis or not analysis.get("success"):
                 diagnostics["no_history"] += 1
@@ -1499,7 +1502,14 @@ class DataEngine:
             # cannot reach the qualification threshold of 55.
             try:
                 preliminary = _self._opportunity_setup(analysis, market, None, seasonality_score)
-            except (TypeError, ValueError, KeyError):
+            except (TypeError, ValueError, KeyError) as exc:
+                diagnostics["scoring_errors"] += 1
+                if len(diagnostics["error_samples"]) < 5:
+                    diagnostics["error_samples"].append({
+                        "symbol": symbol,
+                        "stage": "preliminary_scoring",
+                        "error": str(exc)[:240],
+                    })
                 continue
             risk_value = _self._num(analysis.get("risk_score"))
             # Always populate a transparent ranked monitoring list from successfully
