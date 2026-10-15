@@ -1415,10 +1415,21 @@ class DataEngine:
         market_seasonality = _self.get_market_seasonality(min_years=3)
         seasonality_score = float(market_seasonality.get("score",50))
         rows = []
+        near_misses = []
         analyzed_count = 0
+        diagnostics = {
+            "universe": len(SHARIA_SYMBOLS),
+            "candidates": min(len(candidates), len(SHARIA_SYMBOLS)),
+            "analyzed": 0,
+            "no_history": 0,
+            "technical_blocks": 0,
+            "low_score": 0,
+            "low_rebound": 0,
+            "high_risk": 0,
+            "final_gate": 0,
+        }
         # The screener is requested for up to 100 symbols, enough to cover
-        # the full 96-name Sharia reference universe; analyze all returned matches.
-        # The bounded first-20 fallback above remains in place when the screener fails.
+        # the full Sharia reference universe; analyze all returned matches.
         for item in candidates[:len(SHARIA_SYMBOLS)]:
             symbol = _self.display_symbol(item.get("code") or "")
             if symbol not in SHARIA_SYMBOLS:
@@ -1431,8 +1442,10 @@ class DataEngine:
                 # A malformed quote/history for one company must not stop the full scan.
                 continue
             if not analysis or not analysis.get("success"):
+                diagnostics["no_history"] += 1
                 continue
             analyzed_count += 1
+            diagnostics["analyzed"] = analyzed_count
 
             # Use technical/risk gates before requesting news and training ML.
             # News can add at most 8 points and ML at most 6; candidates below 41
@@ -1442,9 +1455,32 @@ class DataEngine:
             except (TypeError, ValueError, KeyError):
                 continue
             risk_value = _self._num(analysis.get("risk_score"))
-            if preliminary["hard_blocks"] or preliminary["final_opportunity_score"] < 41:
+            if preliminary["hard_blocks"]:
+                diagnostics["technical_blocks"] += 1
                 continue
-            if preliminary["rebound_score"] < 45 or risk_value is None or risk_value > 65:
+            # Keep near-misses visible as a separate monitoring list, never as
+            # buy recommendations. This makes a zero-qualified result explainable.
+            if (preliminary["final_opportunity_score"] >= 35
+                    and preliminary["rebound_score"] >= 30
+                    and risk_value is not None and risk_value <= 65):
+                near_misses.append({
+                    "symbol": symbol,
+                    "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
+                    "date": analysis.get("date"),
+                    "close": analysis.get("close"),
+                    "opportunity_score": preliminary["final_opportunity_score"],
+                    "rebound_score": preliminary["rebound_score"],
+                    "risk_score": analysis.get("risk_score"),
+                    "reason": "مرشح للمراقبة فقط؛ لم يجتز جميع شروط الفرصة المؤهلة.",
+                })
+            if preliminary["final_opportunity_score"] < 41:
+                diagnostics["low_score"] += 1
+                continue
+            if preliminary["rebound_score"] < 45:
+                diagnostics["low_rebound"] += 1
+                continue
+            if risk_value is None or risk_value > 65:
+                diagnostics["high_risk"] += 1
                 continue
 
             try:
@@ -1477,19 +1513,26 @@ class DataEngine:
             # Keep the opportunities screen limited to qualified setups; do not
             # display blocked or high-risk candidates as actionable opportunities.
             if setup["hard_blocks"] or setup["final_opportunity_score"] < 55:
+                diagnostics["final_gate"] += 1
                 continue
             if setup["rebound_score"] < 45:
+                diagnostics["final_gate"] += 1
                 continue
             if risk_value > 65:
+                diagnostics["final_gate"] += 1
                 continue
             rows.append({"symbol": symbol, "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
                 "name_en": item.get("name") or symbol, "date": analysis.get("date"), "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "seasonality_score": setup.get("seasonality_score"), "defensive_bias": setup.get("defensive_bias")})
         rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
+        near_misses.sort(key=lambda x: (x["opportunity_score"], x["rebound_score"]), reverse=True)
+        diagnostics["near_misses"] = len(near_misses)
         if analyzed_count == 0:
             return {
                 "success": False,
                 "error": "تعذر فحص الفرص لأن مزودي البيانات لم يرجعوا تاريخًا صالحًا للأسهم الشرعية. لن نعرض صفر فرص وكأنه نتيجة تحليل مكتمل.",
                 "data": [],
+                "near_misses": [],
+                "diagnostics": diagnostics,
                 "count": 0,
                 "market": market,
                 "sharia_universe_count": len(SHARIA_SYMBOLS),
@@ -1500,7 +1543,15 @@ class DataEngine:
                 record_opportunity(row)
             except Exception:
                 pass
-        return {"success": True, "data": rows[:max(1, min(int(limit), 40))], "count": len(rows), "market": market, "sharia_universe_count": len(SHARIA_SYMBOLS)}
+        return {
+            "success": True,
+            "data": rows[:max(1, min(int(limit), 40))],
+            "near_misses": near_misses[:10],
+            "diagnostics": diagnostics,
+            "count": len(rows),
+            "market": market,
+            "sharia_universe_count": len(SHARIA_SYMBOLS),
+        }
 
 
     def get_premarket_report(self, limit=5):
@@ -1529,6 +1580,8 @@ class DataEngine:
             "before_open": now.hour < 10,
             "market": market,
             "opportunities": opportunities.get("data", [])[:max(1, min(int(limit), 20))],
+            "near_misses": opportunities.get("near_misses", []),
+            "diagnostics": opportunities.get("diagnostics", {}),
             "latest_session_date": latest_session_date,
             "sharia_universe_count": opportunities.get("sharia_universe_count", len(SHARIA_SYMBOLS)),
         }
