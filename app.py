@@ -1367,7 +1367,8 @@ elif page == "⌕  تحليل":
 
                 if technical_visible:
                     st.markdown('<div class="section">📈 الرسم الفني التفاعلي</div>', unsafe_allow_html=True)
-                    chart = pd.DataFrame(result.get("chart") or []).copy()
+                    chart_source = result.get("chart")
+                    chart = chart_source.copy() if isinstance(chart_source, pd.DataFrame) else pd.DataFrame(chart_source or [])
                     if not chart.empty and "date" in chart and "close" in chart:
                         chart["date"] = pd.to_datetime(chart["date"], errors="coerce")
                         for col in ["open", "high", "low", "close", "volume", "sma20", "sma50", "sma200"]:
