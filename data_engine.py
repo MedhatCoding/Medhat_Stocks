@@ -1437,13 +1437,20 @@ class DataEngine:
             "defensive_bias": "ذهب/سيولة دفاعية" if (regime == "ضعيف" or float(seasonality_score) < 42) else "أسهم شرعية انتقائية",
         }
 
-    @st.cache_data(ttl=900, show_spinner=False)
     def get_opportunities(_self, limit=20):
         # Scan the configured Sharia universe itself, not only symbols returned
         # by the provider's short-term-decline screener. A screener subset can
         # hide valid setups among the remaining approved symbols.
         # Keep the request budget conservative: rotate 12 symbols every 15 minutes.
+        # Accumulate completed batches for a rolling full-universe view.
         scan_batch_size = 12
+        if not hasattr(_self, "_opportunity_scan_cache"):
+            _self._opportunity_scan_cache = {"day": None, "batches": {}}
+        scan_cache = _self._opportunity_scan_cache
+        scan_day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if scan_cache.get("day") != scan_day:
+            scan_cache["day"] = scan_day
+            scan_cache["batches"] = {}
         universe_codes = list(dict.fromkeys(
             _self.display_symbol(symbol)
             for symbol in SHARIA_SYMBOLS
@@ -1609,9 +1616,41 @@ class DataEngine:
                 continue
             rows.append({"symbol": symbol, "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
                 "name_en": item.get("name") or symbol, "date": analysis.get("date"), "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "seasonality_score": setup.get("seasonality_score"), "defensive_bias": setup.get("defensive_bias")})
-        rows.sort(key=lambda x: x["opportunity_score"], reverse=True)
-        near_misses.sort(key=lambda x: (x["opportunity_score"], x["rebound_score"]), reverse=True)
-        near_misses = near_misses[:10]
+        # Save this batch and merge it with previously completed batches.
+        scan_cache["batches"][str(batch_start)] = {
+            "rows": rows, "near_misses": near_misses, "diagnostics": diagnostics,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        merged_rows, merged_watch = {}, {}
+        merged_diagnostics = {
+            "universe": len(SHARIA_SYMBOLS), "candidates": 0, "analyzed": 0,
+            "no_history": 0, "technical_blocks": 0, "low_score": 0,
+            "low_rebound": 0, "high_risk": 0, "final_gate": 0,
+            "analysis_errors": 0, "scoring_errors": 0, "error_samples": [],
+        }
+        count_keys = ("candidates", "analyzed", "no_history", "technical_blocks",
+                      "low_score", "low_rebound", "high_risk", "final_gate",
+                      "analysis_errors", "scoring_errors")
+        for saved in scan_cache["batches"].values():
+            for row in saved.get("rows", []):
+                merged_rows[row["symbol"]] = row
+            for row in saved.get("near_misses", []):
+                merged_watch[row["symbol"]] = row
+            sd = saved.get("diagnostics") or {}
+            for key in count_keys:
+                merged_diagnostics[key] += int(sd.get(key, 0) or 0)
+            for error in sd.get("error_samples", []):
+                if len(merged_diagnostics["error_samples"]) < 10:
+                    merged_diagnostics["error_samples"].append(error)
+        rows = sorted(merged_rows.values(), key=lambda x: x["opportunity_score"], reverse=True)
+        near_misses = sorted(merged_watch.values(),
+                             key=lambda x: (x["opportunity_score"], x["rebound_score"]), reverse=True)[:10]
+        diagnostics = merged_diagnostics
+        diagnostics["batches_completed"] = len(scan_cache["batches"])
+        diagnostics["batches_total"] = batch_count
+        diagnostics["scan_complete"] = len(scan_cache["batches"]) >= batch_count
+        diagnostics["last_batch_completed_at"] = max(
+            (v.get("completed_at", "") for v in scan_cache["batches"].values()), default=None)
         diagnostics["near_misses"] = len(near_misses)
         if analyzed_count == 0:
             return {
