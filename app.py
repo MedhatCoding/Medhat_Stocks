@@ -427,81 +427,21 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 }
 </style>
 <style>
-/* AUTHORITATIVE APP NAVIGATION — no radio, no sidebar */
+/* Three-tab app navigation fixed to the bottom on mobile */
 [data-testid="stSidebar"]{display:none!important}
-.st-key-bottom_nav{
-  position:relative!important;
-  width:100%!important;
-  margin:0 0 14px!important;
-  z-index:50!important;
-}
-.st-key-bottom_nav button{
-  min-height:48px!important;
-  border-radius:12px!important;
-  background:#0d1b2c!important;
-  border:1px solid #203750!important;
-  color:#91a4b9!important;
-  font-family:'Cairo',sans-serif!important;
-  font-size:10px!important;
-  font-weight:900!important;
-  line-height:1.2!important;
-  white-space:pre-line!important;
-}
+.st-key-bottom_nav{position:relative!important;width:100%!important;margin:0 0 14px!important;z-index:50!important}
+.st-key-bottom_nav button{min-height:48px!important;border-radius:12px!important;background:#0d1b2c!important;border:1px solid #203750!important;color:#91a4b9!important;font-family:'Cairo',sans-serif!important;font-size:12px!important;font-weight:900!important;line-height:1.2!important;white-space:pre-line!important}
 @media(max-width:700px){
-  .main .block-container{padding-bottom:105px!important}
-  .st-key-bottom_nav{
-    position:fixed!important;
-    left:0!important;
-    right:0!important;
-    bottom:0!important;
-    width:100vw!important;
-    margin:0!important;
-    padding:7px 6px 8px!important;
-    background:#081321!important;
-    border-top:1px solid #29415c!important;
-    box-shadow:0 -14px 35px rgba(0,0,0,.55)!important;
-    z-index:999999!important;
-    direction:rtl!important;
-  }
-  .st-key-bottom_nav>div{
-    width:100%!important;
-    margin:0!important;
-  }
-  .st-key-bottom_nav [data-testid="stHorizontalBlock"]{
-    display:grid!important;
-    grid-template-columns:repeat(7,minmax(0,1fr))!important;
-    gap:3px!important;
-    width:100%!important;
-    margin:0!important;
-  }
-  .st-key-bottom_nav [data-testid="column"]{
-    width:auto!important;
-    min-width:0!important;
-    flex:1 1 0!important;
-  }
-  .st-key-bottom_nav button{
-    width:100%!important;
-    height:68px!important;
-    min-height:68px!important;
-    padding:4px 1px!important;
-    border-radius:13px!important;
-    border:1px solid transparent!important;
-    background:transparent!important;
-    color:#71869b!important;
-    font-size:8px!important;
-  }
-  .st-key-bottom_nav button:hover{
-    border-color:#24583f!important;
-    color:#83f2b5!important;
-  }
+ .main .block-container{padding-bottom:92px!important}
+ .st-key-bottom_nav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;margin:0!important;padding:7px 10px calc(7px + env(safe-area-inset-bottom))!important;background:rgba(8,19,33,.98)!important;border-top:1px solid #29415c!important;box-shadow:0 -14px 35px rgba(0,0,0,.55)!important;z-index:999999!important;direction:rtl!important;backdrop-filter:blur(16px)!important}
+ .st-key-bottom_nav>div{width:100%!important;margin:0!important}
+ .st-key-bottom_nav [data-testid="stHorizontalBlock"]{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;width:100%!important;margin:0!important}
+ .st-key-bottom_nav [data-testid="column"]{width:auto!important;min-width:0!important;flex:1 1 0!important}
+ .st-key-bottom_nav button{width:100%!important;height:58px!important;min-height:58px!important;padding:4px 1px!important;border-radius:15px!important;border:1px solid transparent!important;background:transparent!important;color:#8296ac!important;font-size:12px!important;font-weight:800!important}
+ .st-key-bottom_nav button[kind="primary"]{background:#102b21!important;border-color:#24573e!important;color:#8df5bd!important;box-shadow:inset 0 -3px 0 #22d47a!important}
+ .st-key-bottom_nav button:hover{border-color:#24583f!important;color:#83f2b5!important}
 }
-@media(min-width:701px){
-  .st-key-bottom_nav{
-    display:flex!important;
-    justify-content:flex-start!important;
-  }
-  .st-key-bottom_nav [data-testid="stHorizontalBlock"]{gap:6px!important}
-}
+@media(min-width:701px){.st-key-bottom_nav{position:relative!important;display:flex!important;justify-content:center!important}.st-key-bottom_nav [data-testid="stHorizontalBlock"]{gap:8px!important;max-width:620px!important}}
 </style>
 
 """,
@@ -561,25 +501,40 @@ def app_action(icon, title, subtitle):
     )
 
 # -----------------------------
-# App navigation
+# Three primary tabs: Opportunities, Market, and Everything Else.
+# Existing pages remain available inside the "الباقي" tab.
 # -----------------------------
-# Real app navigation: seven actual buttons in a fixed bottom dock on mobile.
-current_page = st.session_state.mobile_page
+REST_PAGES = [
+    ("⌂  الرئيسية", "الرئيسية"),
+    ("⌕  تحليل", "تحليل سهم"),
+    ("☆  المتابعة", "قائمة المتابعة"),
+    ("▣  المحفظة", "المحفظة"),
+    ("⚙  الإعدادات", "الأداء والإعدادات"),
+]
+page = st.session_state.mobile_page
+if page == "✦  الفرص":
+    active_tab = "الفرص"
+elif page == "◉  السوق":
+    active_tab = "السوق"
+else:
+    active_tab = "الباقي"
+
 NAV_ITEMS = [
-    ("⌂", "الرئيسية"),
-    ("◉", "السوق"),
-    ("⌕", "تحليل"),
-    ("☆", "المتابعة"),
-    ("▣", "المحفظة"),
-    ("✦", "الفرص"),
-    ("⚙", "الإعدادات"),
+    ("✦", "الفرص", "✦  الفرص"),
+    ("◉", "السوق", "◉  السوق"),
+    ("☰", "الباقي", "الباقي"),
 ]
 with st.container(key="bottom_nav"):
-    nav_cols = st.columns(7, gap="small")
-    for nav_col, (icon, label) in zip(nav_cols, NAV_ITEMS):
+    nav_cols = st.columns(3, gap="small")
+    for nav_col, (icon, label, target) in zip(nav_cols, NAV_ITEMS):
         with nav_col:
-            if st.button(f"{icon}\n{label}", key=f"nav_{label}", use_container_width=True, type=("primary" if current_page == f"{icon}  {label}" else "secondary")):
-                st.session_state.mobile_page = f"{icon}  {label}"
+            if st.button(f"{icon}\n{label}", key=f"nav_{label}", use_container_width=True,
+                         type=("primary" if active_tab == label else "secondary")):
+                if target == "الباقي":
+                    if st.session_state.mobile_page not in [x[0] for x in REST_PAGES]:
+                        st.session_state.mobile_page = "⌂  الرئيسية"
+                else:
+                    st.session_state.mobile_page = target
                 st.rerun()
 
 page = st.session_state.mobile_page
@@ -591,7 +546,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
+if active_tab == "الباقي":
+    page_labels = [label for _, label in REST_PAGES]
+    current_label = next((label for key, label in REST_PAGES if key == page), REST_PAGES[0][1])
+    selected_label = st.selectbox("الأقسام الأخرى", page_labels,
+                                  index=page_labels.index(current_label),
+                                  key="rest_section_selector")
+    selected_page = next(key for key, label in REST_PAGES if label == selected_label)
+    if selected_page != page:
+        st.session_state.mobile_page = selected_page
+        st.rerun()
+    st.caption("من هنا تقدر تفتح الرئيسية، تحليل سهم، قائمة المتابعة، المحفظة، والأداء والإعدادات.")
 
 # -----------------------------
 # Dashboard
