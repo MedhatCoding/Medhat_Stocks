@@ -438,10 +438,10 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 }
 .st-key-bottom_nav>div{width:100%!important;margin:0!important}
 .st-key-bottom_nav [data-testid="stHorizontalBlock"]{
- display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;
- width:100%!important;max-width:none!important;margin:0!important;padding:0 10px!important;box-sizing:border-box!important;
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-auto-flow:column!important;gap:0!important;
+ width:100%!important;max-width:none!important;margin:0!important;padding:0!important;box-sizing:border-box!important;
 }
-.st-key-bottom_nav [data-testid="column"]{width:auto!important;min-width:0!important;flex:1 1 0!important}
+.st-key-bottom_nav [data-testid="column"]{width:100%!important;min-width:0!important;max-width:none!important;flex:1 1 0!important;margin:0!important;padding:0!important;box-sizing:border-box!important}
 .st-key-bottom_nav button{
  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
  gap:3px!important;width:100%!important;height:80px!important;min-height:80px!important;padding:6px 2px!important;
@@ -462,7 +462,7 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 @media(max-width:700px){
  .main .block-container{padding-bottom:112px!important}
  .st-key-bottom_nav{padding:8px 0 calc(8px + env(safe-area-inset-bottom))!important}
- .st-key-bottom_nav [data-testid="stHorizontalBlock"]{gap:5px!important;padding:0 7px!important}
+ .st-key-bottom_nav [data-testid="stHorizontalBlock"]{gap:0!important;padding:0!important}
  .st-key-bottom_nav button{height:82px!important;min-height:82px!important;border-radius:15px!important;font-size:15px!important;line-height:1.4!important}
  .st-key-bottom_nav button::before{font-size:26px!important}
 }
