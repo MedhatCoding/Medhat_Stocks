@@ -448,8 +448,8 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
  gap:0!important;margin:0!important;padding:0!important;
 }
 .st-key-bottom_nav [data-testid="column"]{
- display:block!important;flex:0 0 33.333333%!important;
- width:33.333333%!important;min-width:0!important;max-width:33.333333%!important;
+ display:block!important;flex:0 0 25%!important;
+ width:25%!important;min-width:0!important;max-width:25%!important;
  margin:0!important;padding:0 2px!important;
 }
 .st-key-bottom_nav [data-testid="column"]>div,
@@ -469,14 +469,15 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 }
 .st-key-bottom_nav button p{width:100%!important;margin:0!important;padding:0!important;white-space:nowrap!important;text-align:center!important}
 .st-key-bottom_nav button::before{display:block!important;font-size:24px!important;line-height:1!important;font-weight:900!important}
-.st-key-bottom_nav .st-key-nav_opportunities button::before{content:"✦"!important}
+.st-key-bottom_nav .st-key-nav_home button::before{content:"⌂"!important}
+.st-key-bottom_nav .st-key-nav_portfolio button::before{content:"▣"!important}
 .st-key-bottom_nav .st-key-nav_market button::before{content:"◉"!important}
-.st-key-bottom_nav .st-key-nav_more button::before{content:"☰"!important}
+.st-key-bottom_nav .st-key-nav_opportunities button::before{content:"✦"!important}
 .st-key-bottom_nav button[kind="primary"]{background:#102b21!important;border-color:#24573e!important;color:#8df5bd!important;box-shadow:inset 0 -3px 0 #22d47a!important}
 .st-key-bottom_nav button:hover{border-color:#24583f!important;color:#83f2b5!important}
 @media(max-width:700px){
  .main .block-container{padding-bottom:112px!important}
- .st-key-bottom_nav [data-testid="column"]{flex-basis:33.333333%!important;width:33.333333%!important;max-width:33.333333%!important}
+ .st-key-bottom_nav [data-testid="column"]{flex-basis:25%!important;width:25%!important;max-width:25%!important}
  .st-key-bottom_nav button{height:76px!important;min-height:76px!important;font-size:12px!important}
 }</style>
 
@@ -537,8 +538,7 @@ def app_action(icon, title, subtitle):
     )
 
 # -----------------------------
-# Three primary tabs: Opportunities, Market, and Everything Else.
-# Existing pages remain available inside the "الباقي" tab.
+# Four primary app tabs: Home, Portfolio, Market, and Opportunities.
 # -----------------------------
 REST_PAGES = [
     ("⌂  الرئيسية", "الرئيسية"),
@@ -552,27 +552,25 @@ if page == "✦  الفرص":
     active_tab = "الفرص"
 elif page == "◉  السوق":
     active_tab = "السوق"
+elif page == "▣  المحفظة":
+    active_tab = "محفظتي"
 else:
-    active_tab = "الباقي"
+    active_tab = "الرئيسية"
 
 NAV_ITEMS = [
-    ("✦", "الفرص", "✦  الفرص"),
+    ("⌂", "الرئيسية", "⌂  الرئيسية"),
+    ("▣", "محفظتي", "▣  المحفظة"),
     ("◉", "السوق", "◉  السوق"),
-    ("☰", "الباقي", "الباقي"),
+    ("✦", "الفرص", "✦  الفرص"),
 ]
 with st.container(key="bottom_nav"):
-    nav_cols = st.columns(3, gap=None)
+    nav_cols = st.columns(4, gap=None)
     for nav_col, (icon, label, target) in zip(nav_cols, NAV_ITEMS):
-        nav_key = {"الفرص": "nav_opportunities", "السوق": "nav_market", "الباقي": "nav_more"}[label]
+        nav_key = {"الرئيسية": "nav_home", "محفظتي": "nav_portfolio", "السوق": "nav_market", "الفرص": "nav_opportunities"}[label]
         with nav_col:
             if st.button(label, key=nav_key, use_container_width=True,
                          type=("primary" if active_tab == label else "secondary")):
-                if target == "الباقي":
-                    # Always open the "everything else" area on a predictable page.
-                    st.session_state.mobile_page = "⌂  الرئيسية"
-                    st.session_state["rest_section_selector"] = "الرئيسية"
-                else:
-                    st.session_state.mobile_page = target
+                st.session_state.mobile_page = target
                 st.rerun()
 
 page = st.session_state.mobile_page
