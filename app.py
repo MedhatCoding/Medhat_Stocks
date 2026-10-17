@@ -427,29 +427,34 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 }
 </style>
 <style>
-/* Three-tab navigation dock: three equal-width buttons side by side */
+/* Three-tab navigation dock: full viewport, exactly three equal columns */
 [data-testid="stSidebar"]{display:none!important}
-.main .block-container{padding-bottom:110px!important}
+.main .block-container{padding-bottom:112px!important}
 .st-key-bottom_nav{
- position:fixed!important;inset-inline:0!important;left:0!important;right:0!important;bottom:0!important;
- width:100vw!important;max-width:100vw!important;min-width:100vw!important;
- margin:0!important;padding:6px 0!important;box-sizing:border-box!important;
+ position:fixed!important;bottom:0!important;left:0!important;right:0!important;
+ width:100vw!important;min-width:100vw!important;max-width:100vw!important;
+ margin:0!important;margin-left:calc(50% - 50vw)!important;
+ padding:6px 0 env(safe-area-inset-bottom, 0px)!important;
+ box-sizing:border-box!important;overflow:hidden!important;
  background:rgba(8,19,33,.99)!important;border-top:1px solid #29415c!important;
- box-shadow:0 -10px 30px rgba(0,0,0,.4)!important;z-index:999999!important;direction:rtl!important;
+ box-shadow:0 -10px 30px rgba(0,0,0,.4)!important;z-index:999999!important;
+ direction:ltr!important;
 }
-.st-key-bottom_nav>div{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+.st-key-bottom_nav>div{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
 .st-key-bottom_nav [data-testid="stHorizontalBlock"]{
- display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
- width:100%!important;max-width:none!important;min-width:100%!important;
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ grid-auto-flow:column!important;grid-auto-columns:minmax(0,1fr)!important;
+ width:100%!important;min-width:100%!important;max-width:100%!important;
  gap:0!important;margin:0!important;padding:0!important;box-sizing:border-box!important;
 }
 .st-key-bottom_nav [data-testid="column"]{
- flex:1 1 0!important;width:33.333333%!important;min-width:0!important;max-width:33.333333%!important;
- padding:0!important;margin:0!important;box-sizing:border-box!important;
+ display:block!important;float:none!important;flex:none!important;
+ width:100%!important;min-width:0!important;max-width:none!important;
+ margin:0!important;padding:0!important;box-sizing:border-box!important;
 }
 .st-key-bottom_nav [data-testid="column"]>div,
 .st-key-bottom_nav [data-testid="stButton"],
-.st-key-bottom_nav [data-testid="stButton"]>div{width:100%!important;min-width:0!important;max-width:none!important;padding:0!important;margin:0!important;box-sizing:border-box!important}
+.st-key-bottom_nav [data-testid="stButton"]>div{display:block!important;width:100%!important;min-width:0!important;max-width:none!important;margin:0!important;padding:0!important;box-sizing:border-box!important}
 .st-key-bottom_nav button{
  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
  gap:4px!important;width:100%!important;max-width:100%!important;height:76px!important;min-height:76px!important;
@@ -464,10 +469,10 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 .st-key-bottom_nav .st-key-nav_market button::before{content:"◉"!important}
 .st-key-bottom_nav .st-key-nav_more button::before{content:"☰"!important}
 .st-key-bottom_nav button[kind="primary"]{background:#102b21!important;border-color:#24573e!important;color:#8df5bd!important;box-shadow:inset 0 -3px 0 #22d47a!important}
+.st-key-bottom_nav button:hover{border-color:#24583f!important;color:#83f2b5!important}
 @media(max-width:700px){
- .main .block-container{padding-bottom:104px!important}
- .st-key-bottom_nav{padding:4px 0 calc(4px + env(safe-area-inset-bottom))!important}
- .st-key-bottom_nav button{height:72px!important;min-height:72px!important;font-size:13px!important}
+ .main .block-container{padding-bottom:112px!important}
+ .st-key-bottom_nav button{height:76px!important;min-height:76px!important;font-size:13px!important}
  .st-key-bottom_nav button::before{font-size:24px!important}
 }
 </style>
