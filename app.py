@@ -444,11 +444,16 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 .st-key-bottom_nav [data-testid="column"]{width:auto!important;min-width:0!important;flex:1 1 0!important}
 .st-key-bottom_nav button{
  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
- width:100%!important;height:76px!important;min-height:76px!important;padding:7px 2px!important;
+ gap:3px!important;width:100%!important;height:80px!important;min-height:80px!important;padding:6px 2px!important;
  border-radius:16px!important;border:1px solid transparent!important;background:transparent!important;
- color:#a4b6c9!important;font-family:'Cairo',sans-serif!important;font-size:15px!important;
- font-weight:900!important;line-height:1.55!important;white-space:pre-line!important;text-align:center!important;
+ color:#a4b6c9!important;font-family:'Cairo',sans-serif!important;font-size:16px!important;
+ font-weight:900!important;line-height:1.4!important;white-space:normal!important;text-align:center!important;
 }
+.st-key-bottom_nav button p{margin:0!important;padding:0!important}
+.st-key-bottom_nav button::before{display:block!important;font-size:25px!important;line-height:1!important;font-weight:900!important}
+.st-key-bottom_nav .st-key-nav_opportunities button::before{content:"✦"!important}
+.st-key-bottom_nav .st-key-nav_market button::before{content:"◉"!important}
+.st-key-bottom_nav .st-key-nav_more button::before{content:"☰"!important}
 .st-key-bottom_nav button[kind="primary"]{
  background:#102b21!important;border-color:#24573e!important;color:#8df5bd!important;
  box-shadow:inset 0 -3px 0 #22d47a!important;
@@ -458,7 +463,8 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
  .main .block-container{padding-bottom:112px!important}
  .st-key-bottom_nav{padding:8px 0 calc(8px + env(safe-area-inset-bottom))!important}
  .st-key-bottom_nav [data-testid="stHorizontalBlock"]{gap:5px!important;padding:0 7px!important}
- .st-key-bottom_nav button{height:78px!important;min-height:78px!important;border-radius:15px!important;font-size:14px!important;line-height:1.55!important}
+ .st-key-bottom_nav button{height:82px!important;min-height:82px!important;border-radius:15px!important;font-size:15px!important;line-height:1.4!important}
+ .st-key-bottom_nav button::before{font-size:26px!important}
 }
 </style>
 
@@ -545,8 +551,9 @@ NAV_ITEMS = [
 with st.container(key="bottom_nav"):
     nav_cols = st.columns(3, gap="small")
     for nav_col, (icon, label, target) in zip(nav_cols, NAV_ITEMS):
+        nav_key = {"الفرص": "nav_opportunities", "السوق": "nav_market", "الباقي": "nav_more"}[label]
         with nav_col:
-            if st.button(f"{icon}\n{label}", key=f"nav_{label}", use_container_width=True,
+            if st.button(label, key=nav_key, use_container_width=True,
                          type=("primary" if active_tab == label else "secondary")):
                 if target == "الباقي":
                     # Always open the "everything else" area on a predictable page.
