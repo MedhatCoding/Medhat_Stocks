@@ -431,7 +431,7 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 [data-testid="stSidebar"]{display:none!important}
 .main .block-container{padding-bottom:100px!important}
 .st-key-bottom_nav{
- position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;max-width:none!important;
+ position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;min-width:100vw!important;max-width:100vw!important;transform:none!important;box-sizing:border-box!important;
  margin:0!important;padding:8px 0!important;background:rgba(8,19,33,.98)!important;
  border-top:1px solid #29415c!important;box-shadow:0 -14px 35px rgba(0,0,0,.4)!important;
  z-index:999999!important;direction:rtl!important;backdrop-filter:blur(16px)!important;
@@ -557,7 +557,7 @@ NAV_ITEMS = [
     ("☰", "الباقي", "الباقي"),
 ]
 with st.container(key="bottom_nav"):
-    nav_cols = st.columns(3, gap="small")
+    nav_cols = st.columns(3, gap=None)
     for nav_col, (icon, label, target) in zip(nav_cols, NAV_ITEMS):
         nav_key = {"الفرص": "nav_opportunities", "السوق": "nav_market", "الباقي": "nav_more"}[label]
         with nav_col:
