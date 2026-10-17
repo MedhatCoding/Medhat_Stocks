@@ -431,17 +431,25 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 [data-testid="stSidebar"]{display:none!important}
 .main .block-container{padding-bottom:100px!important}
 .st-key-bottom_nav{
- position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;
+ position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;max-width:none!important;
  margin:0!important;padding:8px 0!important;background:rgba(8,19,33,.98)!important;
  border-top:1px solid #29415c!important;box-shadow:0 -14px 35px rgba(0,0,0,.4)!important;
  z-index:999999!important;direction:rtl!important;backdrop-filter:blur(16px)!important;
 }
 .st-key-bottom_nav>div{width:100%!important;margin:0!important}
 .st-key-bottom_nav [data-testid="stHorizontalBlock"]{
- display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-auto-flow:column!important;gap:0!important;
- width:100%!important;max-width:none!important;margin:0!important;padding:0!important;box-sizing:border-box!important;
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-auto-flow:row!important;
+ column-gap:0!important;row-gap:0!important;gap:0!important;
+ width:100%!important;min-width:100%!important;max-width:100%!important;
+ margin:0!important;padding:0!important;box-sizing:border-box!important;
 }
-.st-key-bottom_nav [data-testid="column"]{width:100%!important;min-width:0!important;max-width:none!important;flex:1 1 0!important;margin:0!important;padding:0!important;box-sizing:border-box!important}
+.st-key-bottom_nav [data-testid="column"]{
+ display:block!important;width:auto!important;min-width:0!important;max-width:none!important;
+ flex:none!important; margin:0!important;padding:0!important;box-sizing:border-box!important;
+}
+.st-key-bottom_nav [data-testid="column"]>div,
+.st-key-bottom_nav [data-testid="stButton"],
+.st-key-bottom_nav [data-testid="stButton"]>div{width:100%!important;min-width:0!important;max-width:none!important;box-sizing:border-box!important}
 .st-key-bottom_nav button{
  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
  gap:3px!important;width:100%!important;height:80px!important;min-height:80px!important;padding:6px 2px!important;
