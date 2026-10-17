@@ -531,8 +531,9 @@ with st.container(key="bottom_nav"):
             if st.button(f"{icon}\n{label}", key=f"nav_{label}", use_container_width=True,
                          type=("primary" if active_tab == label else "secondary")):
                 if target == "الباقي":
-                    if st.session_state.mobile_page not in [x[0] for x in REST_PAGES]:
-                        st.session_state.mobile_page = "⌂  الرئيسية"
+                    # Always open the "everything else" area on a predictable page.
+                    st.session_state.mobile_page = "⌂  الرئيسية"
+                    st.session_state["rest_section_selector"] = "الرئيسية"
                 else:
                     st.session_state.mobile_page = target
                 st.rerun()
