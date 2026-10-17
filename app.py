@@ -933,6 +933,12 @@ elif page == "✦  الفرص":
 
         diagnostics = opportunities.get("diagnostics") or {}
         st.markdown('<div class="section">حالة الفحص</div>', unsafe_allow_html=True)
+        completed_batches = int(diagnostics.get("batches_completed", 0) or 0)
+        total_batches = int(diagnostics.get("batches_total", 8) or 8)
+        scan_complete = bool(diagnostics.get("scan_complete", False))
+        progress_label = "اكتمل فحص جميع الدفعات" if scan_complete else f"الفحص التدريجي: {completed_batches} من {total_batches} دفعات"
+        st.caption(progress_label + " • يتم تجميع نتائج الدفعات خلال اليوم، ولا تعني القائمة الحالية أن جميع الأسهم فُحصت بعد.")
+        st.progress(min(1.0, completed_batches / max(1, total_batches)))
         d1, d2, d3, d4 = st.columns(4)
         with d1:
             st.metric("أسهم بالقائمة", diagnostics.get("universe", opportunities.get("sharia_universe_count", "—")))
