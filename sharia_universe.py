@@ -17,7 +17,7 @@ EGX33_SYMBOLS = [
     "ACGC", "ECAP", "ETRS", "ETEL", "ORWE", "MTIE", "JUFO", "ADIB",
     "FAIT", "FAITA", "GGCC", "IDHC", "PHDC", "MASR", "ORAS", "EGAL",
     "MFPC", "SKPC", "CLHO", "FWRY", "EAST", "TMGH", "SODIC", "MBEG",
-    "BTFH", "GOUR", "OBRI",
+    "BTFH", "GOUR",
 ]
 
 SHARIA_SYMBOLS = [
