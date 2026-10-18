@@ -928,6 +928,34 @@ elif page == "✦  الفرص":
 
     if not opportunities.get("success"):
         st.error(opportunities.get("error", "تعذر تشغيل فحص الفرص."))
+        # Keep scan progress and any usable diagnostics visible even when the
+        # provider has not supplied enough history to mark the scan successful.
+        diagnostics = opportunities.get("diagnostics") or {}
+        completed_batches = int(diagnostics.get("batches_completed", 0) or 0)
+        total_batches = int(diagnostics.get("batches_total", 8) or 8)
+        st.caption(
+            f"حالة الفحص: {completed_batches} من {total_batches} دفعات • "
+            f"تم تحليل {int(diagnostics.get('analyzed', 0) or 0)} سهمًا من القائمة المرجعية "
+            f"البالغة {int(diagnostics.get('universe', opportunities.get('sharia_universe_count', 96)) or 96)} سهمًا."
+        )
+        st.progress(min(1.0, completed_batches / max(1, total_batches)))
+        error_samples = diagnostics.get("error_samples") or []
+        if error_samples:
+            with st.expander("تفاصيل أخطاء مزودي البيانات"):
+                st.dataframe(pd.DataFrame(error_samples), use_container_width=True, hide_index=True)
+        near_misses = opportunities.get("near_misses") or []
+        if near_misses:
+            st.markdown('<div class="section">الأسهم التي أمكن تحليلها — للمراقبة فقط وليست توصيات شراء</div>', unsafe_allow_html=True)
+            watch = pd.DataFrame(near_misses).rename(columns={
+                "name": "الشركة", "symbol": "الرمز", "date": "تاريخ البيانات",
+                "close": "آخر سعر متاح", "opportunity_score": "درجة الفرصة",
+                "rebound_score": "درجة الارتداد", "risk_score": "المخاطر",
+                "reason": "سبب عدم التأهل",
+            })
+            if "آخر سعر متاح" in watch:
+                watch["آخر سعر متاح"] = watch["آخر سعر متاح"].map(money)
+            visible = [col for col in ["الشركة", "الرمز", "تاريخ البيانات", "آخر سعر متاح", "درجة الفرصة", "درجة الارتداد", "المخاطر", "سبب عدم التأهل"] if col in watch.columns]
+            st.dataframe(watch[visible], use_container_width=True, hide_index=True)
     elif not opportunities.get("data"):
         st.info("لا توجد فرصة اجتازت شروط التوصية في العينة الحالية. ده لا يعني أن كل الأسهم الـ96 اتفحصت في نفس اللحظة؛ الفحص موزع على دفعات لتقليل استهلاك الـAPI المجانية.")
 
