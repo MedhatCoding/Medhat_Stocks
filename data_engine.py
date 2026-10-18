@@ -346,22 +346,68 @@ class DataEngine:
             return {"success": False, "error": "لا توجد تسعيرة حية في استجابة OANOR"}
         return {"success": True, "data": rows[0]}
 
-    @st.cache_data(ttl=3600, show_spinner=False)
+    @st.cache_data(ttl=21600, show_spinner=False)
     def get_egx_symbols(_self):
+        """Load the EGX directory from EODHD, with a no-key public-directory fallback.
+
+        The fallback is for symbol discovery/search only; it is not used as proof
+        of Sharia compliance or as a source of executable prices.
+        """
         result = _self._get(f"exchange-symbol-list/{_self.EGX_EXCHANGE}")
-        if not result["success"]:
-            return result
-        data = result["data"]
-        if not isinstance(data, list):
-            return {"success": False, "error": "قائمة EGX غير صالحة", "data": []}
-        cleaned = []
-        for row in data:
-            if isinstance(row, dict):
-                code = str(row.get("Code") or row.get("code") or "").upper()
-                name = row.get("Name") or row.get("name") or ""
-                if code:
-                    cleaned.append({"code": code, "name": str(name)})
-        return {"success": True, "data": cleaned}
+        if result.get("success"):
+            data = result.get("data")
+            if isinstance(data, list):
+                cleaned = []
+                for row in data:
+                    if isinstance(row, dict):
+                        code = str(row.get("Code") or row.get("code") or "").upper().strip()
+                        name = row.get("Name") or row.get("name") or ""
+                        if code:
+                            cleaned.append({"code": code.split(".")[0], "name": str(name)})
+                if cleaned:
+                    return {"success": True, "data": cleaned, "provider": "EODHD"}
+        primary_error = result.get("error", "EODHD directory unavailable")
+        # Public, daily-updated directory; only used when the paid directory
+        # endpoint rejects the account or returns no usable rows.
+        try:
+            response = requests.get(
+                "https://stockanalysis.com/list/egyptian-stock-exchange/",
+                headers={"User-Agent": "Mozilla/5.0 (compatible; MedhatStocks/2.0)"},
+                timeout=15,
+            )
+            response.raise_for_status()
+            tables = pd.read_html(response.text)
+            cleaned = []
+            for table in tables:
+                table.columns = [str(col).strip().lower() for col in table.columns]
+                symbol_col = next((col for col in table.columns if col in ("symbol", "ticker", "code")), None)
+                name_col = next((col for col in table.columns if col in ("company", "company name", "name")), None)
+                if symbol_col is None:
+                    continue
+                for _, row in table.iterrows():
+                    code = str(row.get(symbol_col, "")).strip().upper()
+                    if not code or code in ("NAN", "—", "-") or not re.fullmatch(r"[A-Z0-9]{2,12}", code):
+                        continue
+                    name = str(row.get(name_col, "")).strip() if name_col else ""
+                    if name.lower() == "nan":
+                        name = ""
+                    cleaned.append({"code": code, "name": name or _self.ARABIC_COMPANY_NAMES.get(code, code)})
+            unique = {row["code"]: row for row in cleaned}
+            if unique:
+                return {
+                    "success": True,
+                    "data": sorted(unique.values(), key=lambda row: row["code"]),
+                    "provider": "StockAnalysis public directory (fallback)",
+                    "delayed": True,
+                    "warning": "دليل عام للاكتشاف والبحث؛ قد يتأخر أو يتغير تنسيقه.",
+                }
+        except Exception:
+            pass
+        return {
+            "success": False,
+            "error": "تعذر تحميل دليل EGX من EODHD والبديل العام. EODHD: " + str(primary_error),
+            "data": [],
+        }
 
     @st.cache_data(ttl=86400, show_spinner=False)
     def get_sharia_universe_audit(_self):
