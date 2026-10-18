@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from io import StringIO
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
@@ -376,7 +377,7 @@ class DataEngine:
                 timeout=15,
             )
             response.raise_for_status()
-            tables = pd.read_html(response.text)
+            tables = pd.read_html(StringIO(response.text))
             cleaned = []
             for table in tables:
                 table.columns = [str(col).strip().lower() for col in table.columns]
