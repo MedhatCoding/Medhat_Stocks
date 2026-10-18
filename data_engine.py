@@ -363,6 +363,49 @@ class DataEngine:
                     cleaned.append({"code": code, "name": str(name)})
         return {"success": True, "data": cleaned}
 
+    @st.cache_data(ttl=86400, show_spinner=False)
+    def get_sharia_universe_audit(_self):
+        """Compare the dated verified reference against the EGX symbol directory.
+
+        Directory members outside the reference are review candidates only; this
+        method deliberately never upgrades their Sharia status automatically.
+        """
+        listing = _self.get_egx_symbols()
+        if not listing.get("success"):
+            return {
+                "success": False,
+                "error": listing.get("error", "تعذر تحميل قائمة رموز EGX"),
+                "reference_count": len(SHARIA_SYMBOLS),
+                "reference_date": REFERENCE_DATE,
+                "reference_source": REFERENCE_SOURCE,
+                "review_candidates": [],
+                "exchange_count": None,
+            }
+        reference = set(SHARIA_SYMBOLS)
+        candidates = []
+        for row in listing.get("data", []):
+            code = _self.display_symbol(row.get("code", ""))
+            if not code or code in reference:
+                continue
+            candidates.append({
+                "symbol": code,
+                "name": row.get("name") or _self.ARABIC_COMPANY_NAMES.get(code) or code,
+                "status": "pending_sharia_review",
+                "reason": "رمز مدرج خارج المرجع الحالي؛ يحتاج تحققًا شرعيًا موثقًا قبل إدخاله في الفحص",
+            })
+        candidates.sort(key=lambda x: x["symbol"])
+        return {
+            "success": True,
+            "reference_count": len(SHARIA_SYMBOLS),
+            "reference_date": REFERENCE_DATE,
+            "reference_source": REFERENCE_SOURCE,
+            "exchange_count": len(listing.get("data", [])),
+            "review_candidates": candidates,
+            "review_count": len(candidates),
+            "verified_symbols": sorted(reference),
+            "note": "قائمة رموز البورصة لا تثبت التوافق الشرعي؛ المرشحون لا يدخلون توصيات الشراء حتى مراجعتهم.",
+        }
+
     def search_symbols(self, query, limit=12):
         query = (query or "").strip().upper()
         if not query:
