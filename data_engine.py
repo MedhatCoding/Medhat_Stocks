@@ -483,44 +483,73 @@ class DataEngine:
         return {"success": False, "data": []}
 
     def _yahoo_history(self, symbol, period="2y"):
-        """Fallback EGX daily history via Yahoo Finance when EODHD is unavailable."""
+        """Try common Yahoo ticker variants for EGX equities; never invent prices."""
         code = self.display_symbol(symbol)
-        # Avoid creating invalid tickers such as COMI.CA.CA.
-        yahoo_symbol = code if code.upper().endswith(".CA") else f"{code}.CA"
-        try:
-            response = requests.get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}",
-                params={"range": period, "interval": "1d", "events": "history"},
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=20,
-            )
-            response.raise_for_status()
-            payload = response.json()
-            result = (payload.get("chart") or {}).get("result") or []
-            if not result:
-                return {"success": False, "error": "لا توجد بيانات تاريخية لهذا السهم من المصدر البديل.", "data": []}
-            item = result[0]
-            timestamps = item.get("timestamp") or []
-            quote = ((item.get("indicators") or {}).get("quote") or [{}])[0]
-            rows = []
-            for i, ts in enumerate(timestamps):
-                def at(key):
-                    values = quote.get(key) or []
-                    return values[i] if i < len(values) else None
-                if at("close") is None:
+        if not code:
+            return {"success": False, "symbol": "", "error": "رمز السهم فارغ", "data": []}
+        # Yahoo ticker mapping for Egyptian equities is inconsistent. Try a
+        # small deterministic set and stop at the first valid daily series.
+        candidates = []
+        raw = str(symbol or "").strip().upper()
+        for candidate in (raw, code + ".CA", code + ".EGX", code):
+            candidate = candidate.replace(".EGX", ".CA") if candidate.endswith(".EGX") else candidate
+            if candidate and candidate not in candidates:
+                candidates.append(candidate)
+        errors = []
+        for yahoo_symbol in candidates:
+            try:
+                response = requests.get(
+                    f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}",
+                    params={"range": period, "interval": "1d", "events": "history"},
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=12,
+                )
+                if response.status_code in (404, 422):
+                    errors.append(f"{yahoo_symbol}: no symbol")
                     continue
-                rows.append({
-                    "date": datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d"),
-                    "open": at("open"), "high": at("high"), "low": at("low"),
-                    "close": at("close"), "volume": at("volume"),
-                })
-            rows.sort(key=lambda x: x["date"], reverse=True)
-            meta = item.get("meta") or {}
-            return {"success": bool(rows), "symbol": self.normalize_symbol(symbol),
-                    "data": rows, "name_en": meta.get("longName") or meta.get("shortName") or "",
-                    "provider": "Yahoo Finance fallback"}
-        except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
-            return {"success": False, "symbol": self.normalize_symbol(symbol), "error": str(exc), "data": []}
+                response.raise_for_status()
+                payload = response.json()
+                root = payload.get("chart") or {}
+                if root.get("error"):
+                    errors.append(f"{yahoo_symbol}: provider error")
+                    continue
+                result = root.get("result") or []
+                if not result:
+                    errors.append(f"{yahoo_symbol}: empty history")
+                    continue
+                item = result[0]
+                timestamps = item.get("timestamp") or []
+                quote = ((item.get("indicators") or {}).get("quote") or [{}])[0]
+                rows = []
+                for i, ts in enumerate(timestamps):
+                    def at(key):
+                        values = quote.get(key) or []
+                        return values[i] if i < len(values) else None
+                    close = at("close")
+                    if close is None:
+                        continue
+                    rows.append({
+                        "date": datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d"),
+                        "open": at("open"), "high": at("high"), "low": at("low"),
+                        "close": close, "volume": at("volume"),
+                    })
+                if rows:
+                    rows.sort(key=lambda x: x["date"], reverse=True)
+                    meta = item.get("meta") or {}
+                    return {
+                        "success": True, "symbol": self.normalize_symbol(code),
+                        "data": rows, "name_en": meta.get("longName") or meta.get("shortName") or "",
+                        "provider": f"Yahoo Finance ({yahoo_symbol})", "yahoo_symbol": yahoo_symbol,
+                        "delayed": True,
+                    }
+                errors.append(f"{yahoo_symbol}: no valid closes")
+            except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
+                errors.append(f"{yahoo_symbol}: {type(exc).__name__}")
+        return {
+            "success": False, "symbol": self.normalize_symbol(code),
+            "error": "Yahoo Finance لم يُرجع تاريخًا صالحًا لأي صيغة رمز مجرّبة.",
+            "provider_errors": errors, "data": [],
+        }
 
     @st.cache_data(ttl=900, show_spinner=False)
     def get_stock_history(_self, symbol, days=365):
