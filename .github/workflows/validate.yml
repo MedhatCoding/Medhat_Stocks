@@ -23,6 +23,20 @@ jobs:
       - name: Compile Python files
         run: python -m compileall -q .
 
+      - name: Live-check official Sharia source extraction (diagnostic only)
+        run: |
+          pip install pypdf
+          python sharia_source_check.py
+
+      - name: Upload Sharia source audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sharia-source-audit
+          path: artifacts/sharia_source_check.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Smoke import core modules
         run: |
           python - <<'PY'
