@@ -1661,17 +1661,21 @@ class DataEngine:
         diagnostics["last_batch_completed_at"] = max(
             (v.get("completed_at", "") for v in scan_cache["batches"].values()), default=None)
         diagnostics["near_misses"] = len(near_misses)
-        if analyzed_count == 0:
+        # Judge availability from the accumulated scan, not only this time slot.
+        # A batch that was already scanned has analyzed_count == 0 on this rerun,
+        # but earlier batches may contain valid results and near-miss candidates.
+        total_analyzed = int(diagnostics.get("analyzed", 0) or 0)
+        if total_analyzed == 0:
             return {
                 "success": False,
-                "error": "تعذر فحص الفرص لأن مزودي البيانات لم يرجعوا تاريخًا صالحًا للأسهم الشرعية. لن نعرض صفر فرص وكأنه نتيجة تحليل مكتمل.",
+                "error": "تعذر فحص الفرص: لم تُرجع أي دفعة بيانات تاريخية صالحة حتى الآن. هذه حالة فحص غير مكتمل وليست دليلاً على عدم وجود فرص.",
                 "data": [],
-                "near_misses": [],
+                "near_misses": near_misses[:10],
                 "diagnostics": diagnostics,
                 "count": 0,
                 "market": market,
                 "sharia_universe_count": len(SHARIA_SYMBOLS),
-                "analyzed_count": 0,
+                "analyzed_count": total_analyzed,
             }
         for row in rows[:max(1, min(int(limit), 40))]:
             try:
