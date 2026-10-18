@@ -35,20 +35,55 @@ def main():
         m = re.search(r"egypt-list-q([1-4])-(20\d{2})", url, re.I)
         return (int(m.group(2)), int(m.group(1))) if m else (0, 0)
     pdf_url = sorted(dict.fromkeys(links), key=rank, reverse=True)[0]
-    pdf_response = requests.get(pdf_url, headers=HEADERS, timeout=35)
-    pdf_response.raise_for_status()
-    if not pdf_response.content.startswith(b"%PDF"):
-        raise RuntimeError("Official source link did not return PDF bytes")
-    reader = PdfReader(BytesIO(pdf_response.content))
-    text = "\n".join(page.extract_text() or "" for page in reader.pages)
-    if len(text.strip()) < 500:
-        raise RuntimeError("PDF text extraction produced too little text; keeping last-known-good universe")
+    # Official pages can retain stale quarterly PDF URLs. Try all listed PDFs,
+    # newest-first, and always write a diagnostic artifact if the host is broken.
+    checked_urls = []
+    reader = None
+    text = ""
+    selected_url = None
+    failures = []
+    for candidate_url in sorted(dict.fromkeys(links), key=rank, reverse=True):
+        checked_urls.append(candidate_url)
+        try:
+            candidate_response = requests.get(candidate_url, headers=HEADERS, timeout=35)
+            candidate_response.raise_for_status()
+            if not candidate_response.content.startswith(b"%PDF"):
+                failures.append({"url": candidate_url, "error": "response_not_pdf"})
+                continue
+            candidate_reader = PdfReader(BytesIO(candidate_response.content))
+            candidate_text = "\n".join(page.extract_text() or "" for page in candidate_reader.pages)
+            if len(candidate_text.strip()) < 500:
+                failures.append({"url": candidate_url, "error": "text_extraction_too_short"})
+                continue
+            selected_url, reader, text = candidate_url, candidate_reader, candidate_text
+            break
+        except Exception as exc:
+            failures.append({"url": candidate_url, "error": f"{type(exc).__name__}: {exc}"})
+
+    if reader is None:
+        OUT.parent.mkdir(parents=True, exist_ok=True)
+        report = {
+            "checked_at_utc": datetime.now(timezone.utc).isoformat(),
+            "source_page": SOURCE_PAGE,
+            "discovered_pdf_links": checked_urls,
+            "fetch_failures": failures,
+            "ticker_candidates": [],
+            "ticker_candidate_count": 0,
+            "status": "official_source_unavailable",
+            "active_universe_changed": False,
+            "note": "Official PDF links were unavailable or unreadable. Active Sharia universe was left unchanged; no unofficial list was promoted.",
+        }
+        OUT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(json.dumps({k: report[k] for k in ("discovered_pdf_links", "fetch_failures", "status", "active_universe_changed")}, ensure_ascii=False, indent=2))
+        return
+    pdf_url = selected_url
     # This is a diagnostic candidate list, not an approved replacement.
     tokens = sorted(set(TICKER_RE.findall(text)))
     report = {
         "checked_at_utc": datetime.now(timezone.utc).isoformat(),
         "source_page": SOURCE_PAGE,
         "source_pdf": pdf_url,
+        "failed_newer_or_alternate_links": failures,
         "pdf_pages": len(reader.pages),
         "extracted_text_characters": len(text),
         "ticker_candidates": tokens,
