@@ -9,8 +9,8 @@ IMPORTANT:
   belong in a review queue until their Sharia status is verified.
 """
 
-REFERENCE_DATE = "2026-06-08"
-REFERENCE_SOURCE = "Boubyan Capital - Egypt Sharia Compliant Companies Q1 2026"
+REFERENCE_DATE = "2026-09-01"
+REFERENCE_SOURCE = "Boubyan Capital Egypt Sharia list (Q1 2026) + EGX September 2026 EGX33 Shariah review"
 REFERENCE_STATUS = "dated_reference_not_live_certification"
 
 SHARIA_SYMBOLS = [
@@ -18,7 +18,7 @@ SHARIA_SYMBOLS = [
     "AMIA","AMOC","APPC","APSW","ARCC","ARVA","ASHC","ATLC","ATQA","AXPH",
     "BIOC","BTFH","CAED","CLHO","COSG","CPCI","DAPH","DCRC","DPKP","EALR",
     "EFIC","EFID","EGAL","EGAS","ELKA","ELNA","EMRI","ETRS","FAIT","FAITA",
-    "GGCC","GIHD","GMCI","GSSC","GTHE","IDHC","IFAP","INFI","IRON","ISMA",
+    "GGCC","GIHD","GMCI","GOUR","GSSC","GTHE","IDHC","IFAP","INFI","IRON","ISMA",
     "ISMQ","JUFO","KABO","MAAL","MBEG","MASR","MBSC","MCQE","MCRO","MEPA",
     "MFPC","MICH","MILS","MOED","MPCO","MTIE","NCEM","NCGC","NDRL","NEDA",
     "NIPH","NOAF","ORAS","PACH","PHDC","PRDC","RACC","RMDA","RREI","RUBX",
