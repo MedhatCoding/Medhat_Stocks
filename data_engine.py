@@ -26,6 +26,10 @@ except ImportError:
 from ml_engine import train_and_predict
 from recommendation_journal import adaptive_feedback, record_opportunity
 
+# Process-wide cache shared by DataEngine instances created on Streamlit reruns.
+# It survives normal reruns (but intentionally resets on a server reboot).
+_OPPORTUNITY_SCAN_CACHE = {"day": None, "batches": {}}
+
 
 def get_secret(name):
     """Read a secret from Streamlit Secrets first, then environment variables."""
@@ -1444,9 +1448,8 @@ class DataEngine:
         # Keep the request budget conservative: rotate 12 symbols every 15 minutes.
         # Accumulate completed batches for a rolling full-universe view.
         scan_batch_size = 12
-        if not hasattr(_self, "_opportunity_scan_cache"):
-            _self._opportunity_scan_cache = {"day": None, "batches": {}}
-        scan_cache = _self._opportunity_scan_cache
+        global _OPPORTUNITY_SCAN_CACHE
+        scan_cache = _OPPORTUNITY_SCAN_CACHE
         scan_day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if scan_cache.get("day") != scan_day:
             scan_cache["day"] = scan_day
@@ -1463,6 +1466,11 @@ class DataEngine:
         if len(selected_codes) < scan_batch_size and batch_start > 0:
             selected_codes += universe_codes[:scan_batch_size - len(selected_codes)]
         candidates = [{"code": code} for code in selected_codes]
+        batch_key = str(batch_start)
+        # Do not spend API requests repeating a batch already completed today.
+        # Return the accumulated snapshot below; the next 15-minute slot will scan
+        # another batch and refresh the combined result.
+        batch_already_done = batch_key in scan_cache["batches"]
         # Close older recommendations first so the next ML run can learn from real outcomes.
         try:
             from recommendation_journal import evaluate_open
@@ -1489,8 +1497,8 @@ class DataEngine:
             "scoring_errors": 0,
             "error_samples": [],
         }
-        # Analyze only the selected low-request batch in this run.
-        for item in candidates[:scan_batch_size]:
+        # Analyze only the selected low-request batch in this run, and only once per day.
+        for item in ([] if batch_already_done else candidates[:scan_batch_size]):
             symbol = _self.display_symbol(item.get("code") or "")
             if symbol not in SHARIA_SYMBOLS:
                 continue
@@ -1617,10 +1625,11 @@ class DataEngine:
             rows.append({"symbol": symbol, "name": _self.arabic_company_name(symbol, item.get("name") or symbol),
                 "name_en": item.get("name") or symbol, "date": analysis.get("date"), "close": analysis.get("close"), "change_pct": analysis.get("change_pct"), "rsi14": analysis.get("rsi14"), "return20": analysis.get("return20"), "volume_ratio": analysis.get("volume_ratio"), "support": analysis.get("support"), "resistance": analysis.get("resistance"), "risk_score": analysis.get("risk_score"), "opportunity_score": setup["final_opportunity_score"], **setup, "sharia_compliant": True, "sharia_source": REFERENCE_SOURCE, "sharia_reference_date": REFERENCE_DATE, "seasonality_score": setup.get("seasonality_score"), "defensive_bias": setup.get("defensive_bias")})
         # Save this batch and merge it with previously completed batches.
-        scan_cache["batches"][str(batch_start)] = {
-            "rows": rows, "near_misses": near_misses, "diagnostics": diagnostics,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        }
+        if not batch_already_done:
+            scan_cache["batches"][batch_key] = {
+                "rows": rows, "near_misses": near_misses, "diagnostics": diagnostics,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
         merged_rows, merged_watch = {}, {}
         merged_diagnostics = {
             "universe": len(SHARIA_SYMBOLS), "candidates": 0, "analyzed": 0,
