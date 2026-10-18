@@ -19,11 +19,17 @@ from portfolio_advisor import advise as portfolio_advise, asset_info as portfoli
 ai_enabled = bool(data_engine.gemini_api_key)
 technical_visible = bool(SHOW_TECHNICAL_DEFAULT)
 
-# Optional live override: put SHARIA_SYMBOLS = "AAA,BBB,CCC" in Streamlit Secrets.
+# Optional additions for verified Sharia-compliant stocks outside EGX33 and
+# the quarterly reference list. Add only symbols checked against a current
+# Sharia screening source; this extends rather than replaces the base universe.
 try:
-    _sharia_override = st.secrets.get("SHARIA_SYMBOLS", "")
+    _sharia_override = st.secrets.get("SHARIA_EXTRA_SYMBOLS", "")
     if _sharia_override:
-        SHARIA_SYMBOLS = [x.strip().upper().replace(".EGX", "") for x in str(_sharia_override).split(",") if x.strip()]
+        _extra_sharia = [
+            x.strip().upper().replace(".EGX", "").replace(".CA", "")
+            for x in str(_sharia_override).split(",") if x.strip()
+        ]
+        SHARIA_SYMBOLS = list(dict.fromkeys(SHARIA_SYMBOLS + _extra_sharia))
 except Exception:
     pass
 
@@ -648,7 +654,7 @@ if page == "⌂  الرئيسية":
             st.info("لا توجد حالياً فرصة تستوفي شروط الفحص؛ التطبيق لا يعرض فرصة مصطنعة.")
             diag = premarket.get("diagnostics") or {}
             st.caption(
-                f'نتيجة الفحص: تم تحليل {diag.get("analyzed", 0)} من أصل {diag.get("universe", 96)} سهمًا؛ '
+                f'نتيجة الفحص: تم تحليل {diag.get("analyzed", 0)} من أصل {diag.get("universe", len(SHARIA_SYMBOLS))} سهمًا؛ '
                 f'بيانات غير كافية لـ {diag.get("no_history", 0)} سهم، '
                 f'استبعاد فني لـ {diag.get("technical_blocks", 0)}، '
                 f'درجة منخفضة لـ {diag.get("low_score", 0)}، '
@@ -936,7 +942,7 @@ elif page == "✦  الفرص":
         st.caption(
             f"حالة الفحص: {completed_batches} من {total_batches} دفعات • "
             f"تم تحليل {int(diagnostics.get('analyzed', 0) or 0)} سهمًا من القائمة المرجعية "
-            f"البالغة {int(diagnostics.get('universe', opportunities.get('sharia_universe_count', 96)) or 96)} سهمًا."
+            f"البالغة {int(diagnostics.get('universe', opportunities.get('sharia_universe_count', len(SHARIA_SYMBOLS))) or len(SHARIA_SYMBOLS))} سهمًا."
         )
         st.progress(min(1.0, completed_batches / max(1, total_batches)))
         error_samples = diagnostics.get("error_samples") or []
@@ -957,7 +963,7 @@ elif page == "✦  الفرص":
             visible = [col for col in ["الشركة", "الرمز", "تاريخ البيانات", "آخر سعر متاح", "درجة الفرصة", "درجة الارتداد", "المخاطر", "سبب عدم التأهل"] if col in watch.columns]
             st.dataframe(watch[visible], use_container_width=True, hide_index=True)
     elif not opportunities.get("data"):
-        st.info("لا توجد فرصة اجتازت شروط التوصية في العينة الحالية. ده لا يعني أن كل الأسهم الـ96 اتفحصت في نفس اللحظة؛ الفحص موزع على دفعات لتقليل استهلاك الـAPI المجانية.")
+        st.info(f"لا توجد فرصة اجتازت شروط التوصية في الدفعة الحالية. إجمالي قائمة الشريعة المرجعية {len(SHARIA_SYMBOLS)} سهمًا/رمزًا، والفحص موزع على دفعات لتقليل استهلاك الـAPI المجانية؛ القائمة تجمع مرجع الشريعة ربع السنوي ومكونات EGX33، ويمكن توسيعها برموز موثقة عبر SHARIA_EXTRA_SYMBOLS.")
 
         diagnostics = opportunities.get("diagnostics") or {}
         st.markdown('<div class="section">حالة الفحص</div>', unsafe_allow_html=True)
