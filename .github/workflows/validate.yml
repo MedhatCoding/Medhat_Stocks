@@ -49,6 +49,28 @@ jobs:
           print("Neural-network training/prediction test passed.")
           PY
 
+      - name: Test EGX directory fallback when EODHD is unavailable
+        run: |
+          python - <<'PY'
+          from unittest.mock import patch, Mock
+          from data_engine import data_engine
+
+          data_engine.get_egx_symbols.clear()
+          with patch.object(data_engine, "_get", return_value={"success": False, "error": "HTTP 402"}), \
+               patch("data_engine.requests.get") as get:
+              response = Mock()
+              response.status_code = 200
+              response.text = "<table><thead><tr><th>No.</th><th>Symbol</th><th>Company Name</th></tr></thead><tbody><tr><td>1</td><td>SWDY</td><td>El Sewedy Electric</td></tr><tr><td>2</td><td>GOUR</td><td>Gourmet Egypt</td></tr></tbody></table>"
+              response.raise_for_status.return_value = None
+              get.return_value = response
+              result = data_engine.get_egx_symbols()
+              assert result["success"], result
+              assert result["provider"].endswith("(fallback)"), result
+              assert {row["code"] for row in result["data"]} == {"SWDY", "GOUR"}, result
+          data_engine.get_egx_symbols.clear()
+          print("EGX directory fallback test passed.")
+          PY
+
       - name: Test symbol resolution and Sharia guard
         run: |
           python - <<'PY'
