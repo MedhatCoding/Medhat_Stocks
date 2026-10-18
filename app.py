@@ -926,6 +926,53 @@ elif page == "✦  الفرص":
         unsafe_allow_html=True,
     )
 
+    with st.expander("🔎 توسيع قائمة الأسهم — مراجعة الرموز خارج المرجع الشرعي", expanded=False):
+        st.caption(
+            "يقارن هذا الفحص القائمة المرجعية المؤرخة بقائمة رموز البورصة المتاحة من مزود البيانات. "
+            "الأسهم المكتشفة خارج المرجع تُعرض للمراجعة فقط، ولا تُصنّف شرعية تلقائيًا."
+        )
+        if st.button("فحص الرموز المدرجة خارج المرجع", key="audit_sharia_universe", use_container_width=True):
+            st.session_state["sharia_audit_requested"] = True
+        if st.session_state.get("sharia_audit_requested", False):
+            with st.spinner("جاري جلب قائمة رموز البورصة ومقارنتها بالمرجع..."):
+                try:
+                    audit = data_engine.get_sharia_universe_audit()
+                except Exception:
+                    audit = {"success": False, "error": "تعذر إجراء المقارنة الآن."}
+            if not audit.get("success"):
+                st.warning(
+                    "تعذر تحميل قائمة EGX من مزود البيانات؛ لم نضف أي أسهم بالتخمين. "
+                    + str(audit.get("error", ""))
+                )
+            else:
+                m1, m2, m3 = st.columns(3)
+                m1.metric("المرجع الشرعي الحالي", audit.get("reference_count", 0))
+                m2.metric("رموز EGX المكتشفة", audit.get("exchange_count", 0))
+                m3.metric("تحتاج مراجعة شرعية", audit.get("review_count", 0))
+                st.caption(
+                    f"مصدر المرجع: {audit.get('reference_source')} • تاريخ المرجع: {audit.get('reference_date')}"
+                )
+                st.warning(audit.get("note", "الرموز خارج المرجع ليست توصيات ولا تأكيدًا للتوافق الشرعي."))
+                review_rows = audit.get("review_candidates", [])
+                if review_rows:
+                    review_frame = pd.DataFrame([
+                        {"رمز السهم": x.get("symbol"), "اسم الشركة": x.get("name"), "الحالة": "بانتظار مراجعة شرعية"}
+                        for x in review_rows
+                    ])
+                    st.dataframe(review_frame.head(100), use_container_width=True, hide_index=True)
+                    st.download_button(
+                        "تنزيل قائمة المراجعة CSV",
+                        data=review_frame.to_csv(index=False).encode("utf-8-sig"),
+                        file_name="egx_sharia_review_queue.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+                    if len(review_frame) > 100:
+                        st.caption(f"يظهر أول 100 رمز على الشاشة؛ ملف CSV يحتوي القائمة كاملة ({len(review_frame)} رمزًا).")
+                else:
+                    st.success("لم تُكتشف رموز خارج المرجع من قائمة المزود الحالية.")
+                st.info("بعد التحقق من نشاط كل شركة ونسبها المالية وفق معيار شرعي موثق، تُنقل الرموز المعتمدة إلى القائمة الشرعية. لا تستخدم قائمة المراجعة كقائمة شراء.")
+
     with st.spinner("جاري فحص الأسهم المرشحة وتحليل السوق والأخبار..."):
         try:
             opportunities = data_engine.get_opportunities(limit=20)
