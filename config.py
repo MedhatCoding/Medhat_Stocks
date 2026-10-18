@@ -12,9 +12,15 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-# The displayed Sharia universe is sourced from sharia_universe.py; keep this
-# value only as a backwards-compatible fallback for older UI code.
-STOCK_UNIVERSE_SIZE = 96
+# The universe size is derived from the maintained reference list at runtime.
+# Do not hard-code 96: updates to the verified list must flow through the app.
+STOCK_UNIVERSE_SIZE = 0
+
+# Optional extra historical provider. Leave unset until EGX symbol coverage,
+# daily history quality, and free-tier terms have been verified with real data.
+EGXAPI_KEY = os.getenv("EGXAPI_KEY", "")
+TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY", "")
+FMP_API_KEY = os.getenv("FMP_API_KEY", "")
 OPPORTUNITY_SCORE_MIN = 0
 OPPORTUNITY_SCORE_MAX = 100
 
