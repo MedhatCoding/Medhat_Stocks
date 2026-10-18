@@ -1,24 +1,17 @@
-"""Sharia screening universe.
+"""Reference universe for Sharia-compliant EGX equities.
 
-The baseline below is the Egypt Q1-2026 Sharia-compliant list issued by
-Boubyan Capital on 2026-06-08. The application treats it as a reference
-universe, not as a permanent religious ruling. Update the list when the
-source is revised.
+IMPORTANT:
+- This is a dated reference list, not a permanent religious ruling.
+- EGX33 constituents are NOT the complete universe of Sharia-compliant shares.
+- Never add every EGX-listed share automatically as Sharia-compliant. New names
+  must be verified against a documented screening methodology/source.
+- The app may discover additional EGX-listed symbols separately, but those
+  belong in a review queue until their Sharia status is verified.
 """
 
 REFERENCE_DATE = "2026-06-08"
-REFERENCE_SOURCE = "Boubyan Capital - Egypt Sharia Compliant Companies Q1 2026; unioned with official EGX33 Shariah constituents"
-
-# EGX33 constituents are Sharia-screened by the Egyptian Exchange/FRA methodology.
-# This is deliberately a union, not a restriction to index membership: the
-# Boubyan list also contains eligible stocks outside EGX33.
-EGX33_SYMBOLS = [
-    "RACC", "TALM", "ISPH", "ABUK", "EMFD", "AMOC", "OCDI", "SWDY",
-    "ACGC", "ECAP", "ETRS", "ETEL", "ORWE", "MTIE", "JUFO", "ADIB",
-    "FAIT", "FAITA", "GGCC", "IDHC", "PHDC", "MASR", "ORAS", "EGAL",
-    "MFPC", "SKPC", "CLHO", "FWRY", "EAST", "TMGH", "SODIC", "MBEG",
-    "BTFH", "GOUR",
-]
+REFERENCE_SOURCE = "Boubyan Capital - Egypt Sharia Compliant Companies Q1 2026"
+REFERENCE_STATUS = "dated_reference_not_live_certification"
 
 SHARIA_SYMBOLS = [
     "AALR","ACGC","ACRO","ADIB","AIFI","AITG","AIVCB","ALUM","AMER","AMES",
@@ -33,18 +26,11 @@ SHARIA_SYMBOLS = [
     "SWDY","TALM","TRSI","VODE","WATP","ZEOT",
 ]
 
-# Combined reference universe. The list is not capped at 96 and includes
-# EGX33 constituents even when the external quarterly list differs.
-SHARIA_SYMBOLS = list(dict.fromkeys(SHARIA_SYMBOLS + EGX33_SYMBOLS))
-
-# Optional additions are configured via SHARIA_EXTRA_SYMBOLS. They should only
-# be used for symbols verified against a current Sharia screening source.
-def get_sharia_universe(extra_symbols=None):
-    extras = extra_symbols or []
-    normalized = [str(x).strip().upper().replace(".EGX", "").replace(".CA", "")
-                  for x in extras if str(x).strip()]
-    return list(dict.fromkeys(SHARIA_SYMBOLS + normalized))
+# Deduplicate aliases without silently inflating the universe size.
+SHARIA_SYMBOLS = list(dict.fromkeys(s.strip().upper().replace(".CA", "").replace(".EGX", "")
+                                    for s in SHARIA_SYMBOLS if s and s.strip()))
 
 def is_sharia_reference(symbol):
-    code = (symbol or "").strip().upper().replace(".EGX", "").replace(".CA", "")
+    """True only for symbols in the dated, documented reference list."""
+    code = (symbol or "").strip().upper().split(".")[0]
     return code in SHARIA_SYMBOLS
