@@ -51,8 +51,13 @@ def main():
             match = re.search(r"egypt-list-q([1-4])-(20\d{2})", url, re.I)
             return (int(match.group(2)), int(match.group(1))) if match else (0, 0)
 
-        # Try each discovered PDF from newest to oldest; the official site can retain stale links.
-        ordered = sorted(dict.fromkeys(links), key=rank, reverse=True)
+        # The official page sometimes points to a missing newer PDF. Add a known
+        # older official PDF as a diagnostic-only fallback; it is explicitly marked stale.
+        stale_official_fallbacks = [
+            "https://boubyancapital.com/media/filer_public/3b/b7/3bb7ef35-d699-4d91-b9c8-0123ef52bfd3/egypt-list-q1-2025.pdf"
+        ]
+        discovered = sorted(dict.fromkeys(links), key=rank, reverse=True)
+        ordered = discovered + [u for u in stale_official_fallbacks if u not in discovered]
         errors = []
         for pdf_url in ordered:
             try:
@@ -74,6 +79,9 @@ def main():
                     "status": "source_retrieved_needs_validation",
                     "note": "PDF token extraction is diagnostic only; candidates are not auto-approved as Sharia-compliant.",
                 })
+                if pdf_url in stale_official_fallbacks:
+                    report["status"] = "stale_official_fallback_needs_refresh"
+                    report["note"] += " This is an older official PDF fallback, not a current certification."
                 if not 50 <= len(tokens) <= 180:
                     report["status"] = "source_retrieved_suspicious_extraction"
                     report["note"] += " Candidate count outside expected range; review required."
