@@ -18,7 +18,7 @@ from pypdf import PdfReader
 SOURCE_PAGE = "https://www.boubyancapital.com/brokerage/"
 OUT = Path("artifacts/sharia_source_check.json")
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; MedhatStocks-ShariaSourceCheck/1.1)"}
-TICKER_RE = re.compile(r"\\b[A-Z][A-Z0-9]{2,5}\\b")
+TICKER_RE = re.compile(r"\b[A-Z][A-Z0-9]{2,5}\b")
 
 
 def save_report(report):
@@ -48,7 +48,7 @@ def main():
             raise RuntimeError("No official Egypt Sharia PDF link found on Boubyan brokerage page")
 
         def rank(url):
-            match = re.search(r"egypt-list-q([1-4])-(20\\d{2})", url, re.I)
+            match = re.search(r"egypt-list-q([1-4])-(20\d{2})", url, re.I)
             return (int(match.group(2)), int(match.group(1))) if match else (0, 0)
 
         # Try each discovered PDF from newest to oldest; the official site can retain stale links.
@@ -61,7 +61,7 @@ def main():
                 if not pdf_response.content.startswith(b"%PDF"):
                     raise RuntimeError("URL did not return PDF bytes")
                 reader = PdfReader(BytesIO(pdf_response.content))
-                extracted = "\\n".join(page.extract_text() or "" for page in reader.pages)
+                extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
                 if len(extracted.strip()) < 500:
                     raise RuntimeError("PDF text extraction produced too little text")
                 tokens = sorted(set(TICKER_RE.findall(extracted)))
