@@ -70,7 +70,16 @@ def main():
                 if len(extracted.strip()) < 500:
                     raise RuntimeError("PDF text extraction produced too little text")
                 tokens = sorted(set(TICKER_RE.findall(extracted)))
+                try:
+                    from sharia_universe import SHARIA_SYMBOLS
+                    active_symbols = set(SHARIA_SYMBOLS)
+                except Exception:
+                    active_symbols = set()
                 report.update({
+                    "active_reference_count": len(active_symbols),
+                    "extracted_candidates_not_in_reference": sorted(set(tokens) - active_symbols),
+                    "reference_symbols_not_extracted": sorted(active_symbols - set(tokens)),
+                    "comparison_note": "Text-token comparison is a review aid only; it can contain false positives/negatives and never changes the active universe.",
                     "source_pdf": pdf_url,
                     "pdf_pages": len(reader.pages),
                     "extracted_text_characters": len(extracted),
