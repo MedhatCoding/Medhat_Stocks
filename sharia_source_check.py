@@ -44,7 +44,7 @@ def discover_pdf_links(html, page_url=SOURCE_PAGE):
 
 def rank_pdf_url(url):
     """Sort known quarterly PDFs newest-first; unknown naming stays last."""
-    match = re.search(r"egypt-list-q([1-4])-(20\\d{2})", unquote(url), re.I)
+    match = re.search(r"egypt-list-q([1-4])-(20\d{2})", unquote(url), re.I)
     return (int(match.group(2)), int(match.group(1))) if match else (0, 0)
 
 
