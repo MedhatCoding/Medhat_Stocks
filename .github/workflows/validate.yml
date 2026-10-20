@@ -23,6 +23,24 @@ jobs:
       - name: Compile Python files
         run: python -m compileall -q .
 
+      - name: Test official Sharia PDF discovery and quarterly ordering
+        run: |
+          python - <<'PY'
+          from sharia_source_check import discover_pdf_links, rank_pdf_url
+
+          html = """
+          <a class="download" href="/media/egypt-list-q3-2025.pdf">newer</a>
+          <a href='https://boubyancapital.com/media/egypt-list-q1-2026.pdf?download=1'>latest</a>
+          <a href="/media/not-egypt-list.pdf">ignore</a>
+          """
+          links = discover_pdf_links(html)
+          assert len(links) == 2, links
+          assert max(links, key=rank_pdf_url).endswith("egypt-list-q1-2026.pdf?download=1"), links
+          assert rank_pdf_url("https://example.com/unknown.pdf") == (0, 0)
+          assert discover_pdf_links("<html>no PDF link</html>") == []
+          print("Official Sharia PDF discovery/order tests passed.")
+          PY
+
       - name: Live-check official Sharia source extraction (diagnostic only)
         run: |
           pip install pypdf
