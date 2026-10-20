@@ -429,10 +429,15 @@ class DataEngine:
                 "exchange_count": None,
             }
         reference = set(SHARIA_SYMBOLS)
-        candidates = []
+        exchange_rows = {}
         for row in listing.get("data", []):
             code = _self.display_symbol(row.get("code", ""))
-            if not code or code in reference:
+            if code:
+                exchange_rows[code] = row
+
+        candidates = []
+        for code, row in exchange_rows.items():
+            if code in reference:
                 continue
             candidates.append({
                 "symbol": code,
@@ -441,16 +446,31 @@ class DataEngine:
                 "reason": "رمز مدرج خارج المرجع الحالي؛ يحتاج تحققًا شرعيًا موثقًا قبل إدخاله في الفحص",
             })
         candidates.sort(key=lambda x: x["symbol"])
+
+        # Absence from a provider directory is not proof of delisting: vendors can
+        # omit symbols temporarily or use alternate tickers. Flag for reconciliation,
+        # never remove the symbol from the reference automatically.
+        missing_from_directory = [
+            {
+                "symbol": code,
+                "name": _self.ARABIC_COMPANY_NAMES.get(code, code),
+                "status": "not_found_in_current_directory_needs_review",
+                "reason": "الرمز موجود في المرجع الشرعي لكنه غير ظاهر في دليل المزود الحالي؛ تحقق من تغيير الرمز أو الشطب أو نقص بيانات المزود",
+            }
+            for code in sorted(reference - set(exchange_rows))
+        ]
         return {
             "success": True,
             "reference_count": len(SHARIA_SYMBOLS),
             "reference_date": REFERENCE_DATE,
             "reference_source": REFERENCE_SOURCE,
-            "exchange_count": len(listing.get("data", [])),
+            "exchange_count": len(exchange_rows),
             "review_candidates": candidates,
             "review_count": len(candidates),
+            "missing_reference_symbols": missing_from_directory,
+            "missing_reference_count": len(missing_from_directory),
             "verified_symbols": sorted(reference),
-            "note": "قائمة رموز البورصة لا تثبت التوافق الشرعي؛ المرشحون لا يدخلون توصيات الشراء حتى مراجعتهم.",
+            "note": "قائمة رموز البورصة لا تثبت التوافق الشرعي. المرشحون خارج المرجع لا يدخلون توصيات الشراء، والرموز غير الموجودة في دليل المزود لا تُحذف تلقائيًا.",
         }
 
     def search_symbols(self, query, limit=12):
