@@ -44,8 +44,10 @@ def main():
         response.raise_for_status()
         links = re.findall(r'href=["\']([^"\']*egypt-list-[^"\']+\.pdf)["\']', response.text, flags=re.I)
         links = [urljoin(SOURCE_PAGE, link.replace("&amp;", "&")) for link in links]
-        if not links:
-            raise RuntimeError("No official Egypt Sharia PDF link found on Boubyan brokerage page")
+        # Keep going even when the landing page temporarily omits its PDF link:
+        # a known official archive PDF can still provide a clearly labelled stale
+        # diagnostic instead of turning the whole audit into a blind spot.
+        report["official_pdf_links_discovered"] = len(links)
 
         def rank(url):
             match = re.search(r"egypt-list-q([1-4])-(20\d{2})", url, re.I)
@@ -58,6 +60,8 @@ def main():
         ]
         discovered = sorted(dict.fromkeys(links), key=rank, reverse=True)
         ordered = discovered + [u for u in stale_official_fallbacks if u not in discovered]
+        report["official_pdf_urls_discovered"] = discovered
+        report["fallback_pdf_urls_configured"] = len(stale_official_fallbacks)
         errors = []
         for pdf_url in ordered:
             try:
@@ -99,7 +103,9 @@ def main():
                 return
             except Exception as exc:
                 errors.append(f"{pdf_url}: {exc}")
-        raise RuntimeError("All discovered official PDF links failed: " + " | ".join(errors))
+        if not ordered:
+            raise RuntimeError("No official Egypt Sharia PDF link was discovered and no fallback was configured")
+        raise RuntimeError("All discovered official PDF links and configured fallbacks failed: " + " | ".join(errors))
     except Exception as exc:
         report["error"] = str(exc)
         save_report(report)
