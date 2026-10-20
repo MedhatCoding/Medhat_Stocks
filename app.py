@@ -945,10 +945,11 @@ elif page == "✦  الفرص":
                     + str(audit.get("error", ""))
                 )
             else:
-                m1, m2, m3 = st.columns(3)
+                m1, m2, m3, m4 = st.columns(4)
                 m1.metric("المرجع الشرعي الحالي", audit.get("reference_count", 0))
                 m2.metric("رموز EGX المكتشفة", audit.get("exchange_count", 0))
                 m3.metric("تحتاج مراجعة شرعية", audit.get("review_count", 0))
+                m4.metric("رموز غير ظاهرة بالدليل", audit.get("missing_reference_count", 0))
                 st.caption(
                     f"مصدر المرجع: {audit.get('reference_source')} • تاريخ المرجع: {audit.get('reference_date')}"
                 )
@@ -971,7 +972,25 @@ elif page == "✦  الفرص":
                         st.caption(f"يظهر أول 100 رمز على الشاشة؛ ملف CSV يحتوي القائمة كاملة ({len(review_frame)} رمزًا).")
                 else:
                     st.success("لم تُكتشف رموز خارج المرجع من قائمة المزود الحالية.")
-                st.info("بعد التحقق من نشاط كل شركة ونسبها المالية وفق معيار شرعي موثق، تُنقل الرموز المعتمدة إلى القائمة الشرعية. لا تستخدم قائمة المراجعة كقائمة شراء.")
+                missing_rows = audit.get("missing_reference_symbols", [])
+                if missing_rows:
+                    st.subheader("رموز من المرجع غير ظاهرة في دليل المزود")
+                    st.warning("هذا لا يعني الشطب تلقائيًا؛ قد يكون السبب تغيير الرمز أو نقص/تأخر بيانات المزود. راجعها قبل أي تعديل للقائمة.")
+                    missing_frame = pd.DataFrame([
+                        {"رمز السهم": x.get("symbol"), "اسم الشركة": x.get("name"), "الحالة": "مطابقة رمز/شطب/مصدر البيانات"}
+                        for x in missing_rows
+                    ])
+                    st.dataframe(missing_frame.head(100), use_container_width=True, hide_index=True)
+                    st.download_button(
+                        "تنزيل قائمة الرموز غير الظاهرة CSV",
+                        data=missing_frame.to_csv(index=False).encode("utf-8-sig"),
+                        file_name="egx_sharia_missing_reference_review.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+                    if len(missing_frame) > 100:
+                        st.caption(f"يظهر أول 100 رمز على الشاشة؛ ملف CSV يحتوي القائمة كاملة ({len(missing_frame)} رمزًا).")
+                st.info("بعد التحقق من نشاط كل شركة ونسبها المالية وفق معيار شرعي موثق، تُنقل الرموز المعتمدة إلى القائمة الشرعية. الرموز غير الظاهرة بالدليل لا تُحذف تلقائيًا، ولا تستخدم قوائم المراجعة كقائمة شراء.")
 
     with st.spinner("جاري فحص الأسهم المرشحة وتحليل السوق والأخبار..."):
         try:
