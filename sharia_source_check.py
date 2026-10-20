@@ -10,7 +10,8 @@ import re
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import urljoin
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlparse, unquote
 
 import requests
 from pypdf import PdfReader
@@ -19,6 +20,33 @@ SOURCE_PAGE = "https://www.boubyancapital.com/brokerage/"
 OUT = Path("artifacts/sharia_source_check.json")
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; MedhatStocks-ShariaSourceCheck/1.1)"}
 TICKER_RE = re.compile(r"\b[A-Z][A-Z0-9]{2,5}\b")
+
+class _PDFLinkParser(HTMLParser):
+    """Collect PDF hrefs robustly without depending on attribute order/casing."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.hrefs = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() != "a":
+            return
+        href = dict((key.lower(), value or "") for key, value in attrs).get("href", "")
+        path = unquote(urlparse(href).path).lower()
+        if "egypt-list-" in path and path.endswith(".pdf"):
+            self.hrefs.append(href)
+
+
+def discover_pdf_links(html, page_url=SOURCE_PAGE):
+    parser = _PDFLinkParser()
+    parser.feed(html or "")
+    return sorted({urljoin(page_url, href.replace("&amp;", "&")) for href in parser.hrefs})
+
+
+def rank_pdf_url(url):
+    """Sort known quarterly PDFs newest-first; unknown naming stays last."""
+    match = re.search(r"egypt-list-q([1-4])-(20\\d{2})", unquote(url), re.I)
+    return (int(match.group(2)), int(match.group(1))) if match else (0, 0)
+
 
 
 def save_report(report):
@@ -42,23 +70,18 @@ def main():
     try:
         response = requests.get(SOURCE_PAGE, headers=HEADERS, timeout=25)
         response.raise_for_status()
-        links = re.findall(r'href=["\']([^"\']*egypt-list-[^"\']+\.pdf)["\']', response.text, flags=re.I)
-        links = [urljoin(SOURCE_PAGE, link.replace("&amp;", "&")) for link in links]
+        links = discover_pdf_links(response.text)
         # Keep going even when the landing page temporarily omits its PDF link:
         # a known official archive PDF can still provide a clearly labelled stale
         # diagnostic instead of turning the whole audit into a blind spot.
         report["official_pdf_links_discovered"] = len(links)
-
-        def rank(url):
-            match = re.search(r"egypt-list-q([1-4])-(20\d{2})", url, re.I)
-            return (int(match.group(2)), int(match.group(1))) if match else (0, 0)
 
         # The official page sometimes points to a missing newer PDF. Add a known
         # older official PDF as a diagnostic-only fallback; it is explicitly marked stale.
         stale_official_fallbacks = [
             "https://boubyancapital.com/media/filer_public/3b/b7/3bb7ef35-d699-4d91-b9c8-0123ef52bfd3/egypt-list-q1-2025.pdf"
         ]
-        discovered = sorted(dict.fromkeys(links), key=rank, reverse=True)
+        discovered = sorted(dict.fromkeys(links), key=rank_pdf_url, reverse=True)
         ordered = discovered + [u for u in stale_official_fallbacks if u not in discovered]
         report["official_pdf_urls_discovered"] = discovered
         report["fallback_pdf_urls_configured"] = len(stale_official_fallbacks)
@@ -84,7 +107,7 @@ def main():
                     "extracted_candidates_not_in_reference": sorted(set(tokens) - active_symbols),
                     "reference_symbols_not_extracted": sorted(active_symbols - set(tokens)),
                     "comparison_note": "Text-token comparison is a review aid only; it can contain false positives/negatives and never changes the active universe.",
-                    "source_pdf": pdf_url,
+                    "source_pdf": pdf_url,\n                    "source_pdf_is_official_page_link": pdf_url in discovered,\n                    "source_pdf_quarter_rank": list(rank_pdf_url(pdf_url)),
                     "pdf_pages": len(reader.pages),
                     "extracted_text_characters": len(extracted),
                     "ticker_candidates": tokens,
