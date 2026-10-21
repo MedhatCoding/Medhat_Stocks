@@ -454,8 +454,8 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
  gap:0!important;margin:0!important;padding:0!important;
 }
 .st-key-bottom_nav [data-testid="column"]{
- display:block!important;flex:0 0 25%!important;
- width:25%!important;min-width:0!important;max-width:25%!important;
+ display:block!important;flex:0 0 33.333333%!important;
+ width:33.333333%!important;min-width:0!important;max-width:33.333333%!important;
  margin:0!important;padding:0 2px!important;
 }
 .st-key-bottom_nav [data-testid="column"]>div,
@@ -475,15 +475,14 @@ div[data-testid="stButton"]>button{min-height:50px!important;border-radius:14px!
 }
 .st-key-bottom_nav button p{width:100%!important;margin:0!important;padding:0!important;white-space:nowrap!important;text-align:center!important}
 .st-key-bottom_nav button::before{display:block!important;font-size:24px!important;line-height:1!important;font-weight:900!important}
-.st-key-bottom_nav .st-key-nav_home button::before{content:"⌂"!important}
-.st-key-bottom_nav .st-key-nav_portfolio button::before{content:"▣"!important}
+.st-key-bottom_nav .st-key-nav_rest button::before{content:"☰"!important}
 .st-key-bottom_nav .st-key-nav_market button::before{content:"◉"!important}
 .st-key-bottom_nav .st-key-nav_opportunities button::before{content:"✦"!important}
 .st-key-bottom_nav button[kind="primary"]{background:#102b21!important;border-color:#24573e!important;color:#8df5bd!important;box-shadow:inset 0 -3px 0 #22d47a!important}
 .st-key-bottom_nav button:hover{border-color:#24583f!important;color:#83f2b5!important}
 @media(max-width:700px){
  .main .block-container{padding-bottom:112px!important}
- .st-key-bottom_nav [data-testid="column"]{flex-basis:25%!important;width:25%!important;max-width:25%!important}
+ .st-key-bottom_nav [data-testid="column"]{flex-basis:33.333333%!important;width:33.333333%!important;max-width:33.333333%!important}
  .st-key-bottom_nav button{height:76px!important;min-height:76px!important;font-size:12px!important}
 }</style>
 
@@ -558,21 +557,20 @@ if page == "✦  الفرص":
     active_tab = "الفرص"
 elif page == "◉  السوق":
     active_tab = "السوق"
-elif page == "▣  المحفظة":
-    active_tab = "محفظتي"
+elif page == "☰  الباقي":
+    active_tab = "الباقي"
 else:
-    active_tab = "الرئيسية"
+    active_tab = "الباقي"
 
 NAV_ITEMS = [
-    ("⌂", "الرئيسية", "⌂  الرئيسية"),
-    ("▣", "محفظتي", "▣  المحفظة"),
-    ("◉", "السوق", "◉  السوق"),
     ("✦", "الفرص", "✦  الفرص"),
+    ("◉", "السوق", "◉  السوق"),
+    ("☰", "الباقي", "☰  الباقي"),
 ]
 with st.container(key="bottom_nav"):
-    nav_cols = st.columns(4, gap=None)
+    nav_cols = st.columns(3, gap=None)
     for nav_col, (icon, label, target) in zip(nav_cols, NAV_ITEMS):
-        nav_key = {"الرئيسية": "nav_home", "محفظتي": "nav_portfolio", "السوق": "nav_market", "الفرص": "nav_opportunities"}[label]
+        nav_key = {"الباقي": "nav_rest", "السوق": "nav_market", "الفرص": "nav_opportunities"}[label]
         with nav_col:
             if st.button(label, key=nav_key, use_container_width=True,
                          type=("primary" if active_tab == label else "secondary")):
@@ -588,17 +586,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-if active_tab == "الباقي":
+if page == "☰  الباقي":
     page_labels = [label for _, label in REST_PAGES]
-    current_label = next((label for key, label in REST_PAGES if key == page), REST_PAGES[0][1])
-    selected_label = st.selectbox("الأقسام الأخرى", page_labels,
-                                  index=page_labels.index(current_label),
-                                  key="rest_section_selector")
-    selected_page = next(key for key, label in REST_PAGES if label == selected_label)
-    if selected_page != page:
-        st.session_state.mobile_page = selected_page
-        st.rerun()
-    st.caption("من هنا تقدر تفتح الرئيسية، تحليل سهم، قائمة المتابعة، المحفظة، والأداء والإعدادات.")
+    current_label = st.session_state.get("rest_section_selector", REST_PAGES[0][1])
+    def _open_rest_section():
+        selected = st.session_state.get("rest_section_selector", REST_PAGES[0][1])
+        st.session_state.mobile_page = next(key for key, label in REST_PAGES if label == selected)
+    st.selectbox("الأقسام الأخرى", page_labels,
+                 index=page_labels.index(current_label),
+                 key="rest_section_selector",
+                 on_change=_open_rest_section)
+    st.caption("اختار القسم المطلوب من القائمة: الرئيسية، تحليل سهم، قائمة المتابعة، المحفظة، أو الأداء والإعدادات.")
 
 # -----------------------------
 # Dashboard
