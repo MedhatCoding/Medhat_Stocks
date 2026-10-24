@@ -41,6 +41,20 @@ jobs:
           print("Official Sharia PDF discovery/order tests passed.")
           PY
 
+      - name: Test Sharia universe review queue safeguards
+        run: |
+          python - <<PY
+          from sharia_source_check import build_review_queue
+
+          queue = build_review_queue(["AAA", "BBB", "AAA"], ["BBB", "CCC"])
+          assert [x["symbol"] for x in queue["new_candidates_for_review"]] == ["AAA"], queue
+          assert [x["symbol"] for x in queue["reference_symbols_not_extracted"]] == ["CCC"], queue
+          assert queue["matched_reference_symbols"] == ["BBB"], queue
+          assert queue["auto_approval_performed"] is False
+          assert queue["auto_removal_performed"] is False
+          print("Sharia review queue and no-auto-change safeguards passed.")
+          PY
+
       - name: Live-check official Sharia source extraction (diagnostic only)
         run: |
           pip install pypdf
