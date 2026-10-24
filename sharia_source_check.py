@@ -5,6 +5,7 @@ recorded as a report so that external-source outages do not mask app test result
 """
 from __future__ import annotations
 
+import csv
 import json
 import re
 from datetime import datetime, timezone
@@ -68,6 +69,27 @@ def build_review_queue(extracted_symbols, reference_symbols):
         "auto_removal_performed": False,
     }
 
+def save_review_csvs(review_queue):
+    """Write separate, spreadsheet-friendly review queues; never mutate the reference list."""
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    outputs = {
+        "new_candidates_for_review": (
+            OUT.parent / "sharia_new_candidates_review.csv",
+            ("symbol", "reason"),
+        ),
+        "reference_symbols_not_extracted": (
+            OUT.parent / "sharia_reference_symbols_not_extracted.csv",
+            ("symbol", "reason"),
+        ),
+    }
+    for key, (path, fields) in outputs.items():
+        with path.open("w", encoding="utf-8-sig", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(review_queue.get(key, []))
+    return {key: str(path) for key, (path, _) in outputs.items()}
+
+
 def save_report(report):
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -122,7 +144,9 @@ def main():
                 except Exception:
                     active_symbols = set()
                 review_queue = build_review_queue(tokens, active_symbols)
+                review_csvs = save_review_csvs(review_queue)
                 report.update({
+                    "review_csv_artifacts": review_csvs,
                     "active_reference_count": len(active_symbols),
                     "extracted_candidates_not_in_reference": sorted(set(tokens) - active_symbols),
                     "reference_symbols_not_extracted": sorted(active_symbols - set(tokens)),
