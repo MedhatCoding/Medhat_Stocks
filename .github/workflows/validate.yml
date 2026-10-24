@@ -66,6 +66,8 @@ jobs:
         with:
           name: sharia-source-audit
           path: artifacts/sharia_source_check.json
+            artifacts/sharia_new_candidates_review.csv
+            artifacts/sharia_reference_symbols_not_extracted.csv
           if-no-files-found: warn
           retention-days: 30
 
