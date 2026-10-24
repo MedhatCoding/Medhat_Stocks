@@ -49,6 +49,25 @@ def rank_pdf_url(url):
 
 
 
+
+def build_review_queue(extracted_symbols, reference_symbols):
+    """Create a human-review queue; PDF text extraction is not certification."""
+    extracted = {str(s).strip().upper() for s in extracted_symbols if str(s).strip()}
+    reference = {str(s).strip().upper() for s in reference_symbols if str(s).strip()}
+    return {
+        "new_candidates_for_review": [
+            {"symbol": s, "reason": "Found in PDF text but absent from dated reference; verify ticker and Sharia status."}
+            for s in sorted(extracted - reference)
+        ],
+        "reference_symbols_not_extracted": [
+            {"symbol": s, "reason": "Not detected in PDF text; could be extraction error, rename, or removal. Do not remove automatically."}
+            for s in sorted(reference - extracted)
+        ],
+        "matched_reference_symbols": sorted(extracted & reference),
+        "auto_approval_performed": False,
+        "auto_removal_performed": False,
+    }
+
 def save_report(report):
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -102,10 +121,14 @@ def main():
                     active_symbols = set(SHARIA_SYMBOLS)
                 except Exception:
                     active_symbols = set()
+                review_queue = build_review_queue(tokens, active_symbols)
                 report.update({
                     "active_reference_count": len(active_symbols),
                     "extracted_candidates_not_in_reference": sorted(set(tokens) - active_symbols),
                     "reference_symbols_not_extracted": sorted(active_symbols - set(tokens)),
+                    "review_queue": review_queue,
+                    "review_queue_candidate_count": len(review_queue["new_candidates_for_review"]),
+                    "review_queue_possible_exit_count": len(review_queue["reference_symbols_not_extracted"]),
                     "comparison_note": "Text-token comparison is a review aid only; it can contain false positives/negatives and never changes the active universe.",
                     "source_pdf": pdf_url,
                     "source_pdf_is_official_page_link": pdf_url in discovered,
